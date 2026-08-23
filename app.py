@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from database import create_database
+import sqlite3
 
 st.set_page_config(page_title="Job Application Tracker", layout="wide")
 
@@ -22,4 +24,16 @@ status = st.sidebar.selectbox(
 )
 
 if st.sidebar.button("Save Job"):
-    st.success("Job saved (MVP — not stored yet)")
+    conn = sqlite3.connect("jobs.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO jobs (company, job_title, country, salary, currency, visa, job_url, application_date, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (company, job_title, country, salary, currency, visa, job_url, str(application_date), status))
+
+    conn.commit()
+    conn.close()
+
+    st.success("Job saved successfully!")
+
