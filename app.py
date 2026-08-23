@@ -37,3 +37,22 @@ if st.sidebar.button("Save Job"):
 
     st.success("Job saved successfully!")
 
+st.header("📄 Saved Job Applications")
+
+conn = sqlite3.connect("jobs.db")
+cursor = conn.cursor()
+
+cursor.execute("SELECT * FROM jobs")
+rows = cursor.fetchall()
+
+conn.close()
+
+if rows:
+    df = pd.DataFrame(rows, columns=[
+        "ID", "Company", "Job Title", "Country", "Salary", "Currency",
+        "Visa", "Job URL", "Application Date", "Status"
+    ])
+    st.dataframe(df)
+else:
+    st.info("No jobs saved yet.")
+
