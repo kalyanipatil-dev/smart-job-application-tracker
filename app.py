@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-from auth import signup_form, login_form
+from auth import signup_form, login_form, get_user
 from crud import add_job, get_all_jobs, get_job_by_id, update_job, delete_job
 from filters import apply_search, apply_filters
 from export import export_excel, export_word
@@ -13,7 +13,45 @@ st.set_page_config(page_title="Job Application Tracker", layout="wide")
 # ---------------- ROUTING ----------------
 def main():
 
-    # If NOT logged in → show signup/login
+    # ---------------- HEADER ADMIN BUTTON ----------------
+    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+    with col4:
+        admin_clicked = st.button("Admin", key="admin_header_button")
+
+    if admin_clicked:
+        st.session_state["show_admin_login"] = True
+
+    # ---------------- ADMIN LOGIN POPUP ----------------
+    if st.session_state.get("show_admin_login"):
+        st.sidebar.subheader("Admin Login")
+
+        email = st.sidebar.text_input("Admin Email")
+        password = st.sidebar.text_input("Admin Password", type="password")
+
+        if st.sidebar.button("Login as Admin"):
+            user = get_user(email, password)
+
+            if not user:
+                st.sidebar.error("Invalid admin credentials.")
+            else:
+                _id, name, email, role, status = user
+
+                if role != "admin":
+                    st.sidebar.error("This account is not an admin.")
+                elif status == "inactive":
+                    st.sidebar.error("Admin account is deactivated.")
+                else:
+                    st.session_state["user_id"] = _id
+                    st.session_state["user_name"] = name
+                    st.session_state["user_email"] = email
+                    st.session_state["role"] = role
+                    st.session_state["show_admin_login"] = False
+                    st.success("Admin logged in successfully!")
+                    st.rerun()
+
+        return
+
+    # ---------------- USER / SIGNUP ROUTING ----------------
     if "user_email" not in st.session_state:
         st.title("Welcome to Smart Job Application Tracker")
 
@@ -27,7 +65,7 @@ def main():
 
         return
 
-    # If logged in → check role
+    # ---------------- ROLE CHECK ----------------
     role = st.session_state.get("role", "user")
     user_email = st.session_state.get("user_email")
 
