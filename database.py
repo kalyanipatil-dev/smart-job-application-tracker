@@ -10,7 +10,7 @@ def init_db():
     conn = get_connection()
     c = conn.cursor()
 
-    # Users table
+    # ---------------- USERS TABLE ----------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +26,7 @@ def init_db():
         )
     """)
 
-    # Jobs table
+    # ---------------- JOBS TABLE ----------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +43,7 @@ def init_db():
         )
     """)
 
-    # Logs table
+    # ---------------- LOGS TABLE ----------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
