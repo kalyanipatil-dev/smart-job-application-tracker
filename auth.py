@@ -8,8 +8,25 @@ from crud import add_log
 
 # ---------------- EMAIL VALIDATION ----------------
 def validate_email(email: str) -> bool:
-    pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
-    return re.match(pattern, email) is not None
+    email = email.strip()
+    if email.count("@") != 1:
+        return False
+
+    local, domain = email.split("@")
+
+    if not local or not domain:
+        return False
+
+    if "." not in domain:
+        return False
+
+    if domain.startswith(".") or domain.endswith("."):
+        return False
+
+    if ".." in domain:
+        return False
+
+    return True
 
 # ---------------- PASSWORD VALIDATION ----------------
 def validate_password(password: str) -> (bool, str):
@@ -28,9 +45,7 @@ def validate_password(password: str) -> (bool, str):
 # ---------------- MOBILE VALIDATION ----------------
 def validate_mobile(mobile: str) -> (bool, str):
     if not mobile.isdigit():
-        return False, "Mobile number must contain only digits."
-    if len(mobile) != 10:
-        return False, "Mobile number must be exactly 10 digits."
+        return False, "Invalid mobile number. Please enter numbers only."
     return True, ""
 
 # ---------------- DB HELPERS ----------------
@@ -102,9 +117,12 @@ def signup_form():
             st.error(msg_mobile)
             return
 
-        if not validate_email(email):
-            st.error("Invalid email format.")
+        email_input = email.strip()
+        if not validate_email(email_input):
+            st.error("Invalid email address. Please enter a valid email.")
             return
+
+        email_normalized = email_input.lower()
 
         valid_pass, msg_pass = validate_password(password)
         if not valid_pass:
@@ -113,19 +131,29 @@ def signup_form():
 
         conn = get_connection()
         c = conn.cursor()
+
+        # Case-insensitive duplicate email check
+        c.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email_normalized,))
+        existing = c.fetchone()
+
+        if existing:
+            st.error("An account with this email already exists. Please log in instead.")
+            conn.close()
+            return
+
         try:
             c.execute(
                 """
                 INSERT INTO users (name, username, email, mobile, password, role, status, first_login)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, username, email, mobile, password, "user", "active", 0),
+                (name, username, email_normalized, mobile, password, "user", "active", 0),
             )
             conn.commit()
             st.success("Account created successfully! Please login.")
-            add_log(email, "signup", "User signed up")
+            add_log(email_normalized, "signup", "User signed up")
         except Exception:
-            st.error("Username or Email already exists.")
+            st.error("An account with this email already exists. Please log in instead.")
         finally:
             conn.close()
 
@@ -137,15 +165,16 @@ def login_form():
     password = st.text_input("Password", type="password", key="user_login_pass")
 
     if st.button("Login", key="user_login_btn"):
-        if not validate_email(email):
-            st.error("Invalid email format.")
+        email_input = email.strip().lower()
+        if not validate_email(email_input):
+            st.error("Invalid email address. Please enter a valid email.")
             return
 
-        user = get_user(email, password)
+        user = get_user(email_input, password)
         if not user:
             st.error("Invalid credentials.")
         else:
-            _id, name, email, role, status = user
+            _id, name, email_db, role, status = user
 
             if status == "inactive":
                 st.error("Account is deactivated.")
@@ -153,10 +182,10 @@ def login_form():
 
             st.session_state["user_id"] = _id
             st.session_state["user_name"] = name
-            st.session_state["user_email"] = email
+            st.session_state["user_email"] = email_db
             st.session_state["role"] = role
 
-            add_log(email, "login", "User logged in")
+            add_log(email_db, "login", "User logged in")
             st.success("Logged in successfully!")
             st.rerun()
 
@@ -179,7 +208,7 @@ def admin_first_login():
             st.sidebar.error("This account is not admin.")
             return
 
-        if email != u_email:
+        if email.strip().lower() != u_email.strip().lower():
             st.sidebar.error("Email does not match admin account.")
             return
 
