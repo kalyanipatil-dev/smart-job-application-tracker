@@ -23,3 +23,6 @@ def create_database():
     conn.close()
 
 create_database()
+
+def get_connection():
+    return sqlite3.connect("jobs.db")
