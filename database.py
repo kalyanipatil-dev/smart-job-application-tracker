@@ -2,12 +2,32 @@ import sqlite3
 
 DB_NAME = "jobs.db"
 
-def create_database():
+def get_connection():
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    return conn
 
-    # ---------------- JOBS TABLE (original) ----------------
-    cursor.execute("""
+def init_db():
+    conn = get_connection()
+    c = conn.cursor()
+
+    # Users table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            username TEXT UNIQUE,
+            email TEXT UNIQUE,
+            mobile TEXT,
+            password TEXT,
+            role TEXT DEFAULT 'user',
+            status TEXT DEFAULT 'active',
+            first_login INTEGER DEFAULT 1,
+            otp_code TEXT
+        )
+    """)
+
+    # Jobs table
+    c.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             company TEXT,
@@ -18,26 +38,13 @@ def create_database():
             visa TEXT,
             job_url TEXT,
             application_date TEXT,
-            status TEXT
+            status TEXT,
+            user_email TEXT
         )
     """)
 
-    # ---------------- USERS TABLE (new) ----------------
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT UNIQUE,
-            password TEXT,
-            address TEXT,
-            phone TEXT,
-            role TEXT,
-            status TEXT
-        )
-    """)
-
-    # ---------------- LOGS TABLE (new) ----------------
-    cursor.execute("""
+    # Logs table
+    c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_email TEXT,
@@ -49,9 +56,3 @@ def create_database():
 
     conn.commit()
     conn.close()
-
-# Run once
-create_database()
-
-def get_connection():
-    return sqlite3.connect(DB_NAME, check_same_thread=False)
