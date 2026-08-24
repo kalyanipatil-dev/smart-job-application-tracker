@@ -1,5 +1,4 @@
 import pandas as pd
-from fpdf import FPDF
 from docx import Document
 from docx.shared import Pt, Inches
 from io import BytesIO
@@ -50,63 +49,6 @@ def export_excel(df):
     final_output = BytesIO()
     wb.save(final_output)
     return final_output.getvalue()
-
-
-# ---------------- PDF EXPORT (WORD-STYLE PREMIUM FORMAT) ----------------
-def export_pdf(df):
-    pdf = FPDF()
-    pdf.add_page()
-
-    # Title centered
-    pdf.set_text_color(0, 0, 180)
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, txt="Smart Job Application Tracker", ln=True, align="C")
-    pdf.ln(4)
-
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 8, txt="Job Applications", ln=True, align="L")
-    pdf.ln(3)
-
-    # Balanced column widths (Word-style)
-    col_widths = [
-        12,  # ID
-        28,  # Company
-        45,  # Job Title
-        22,  # Country
-        18,  # Salary
-        18,  # Currency
-        15,  # Visa
-        60,  # Job URL
-        26,  # Application Date
-        20   # Status
-    ]
-
-    pdf.set_fill_color(230, 230, 230)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "B", 8)
-
-    # Header row
-    for i, col in enumerate(df.columns):
-        pdf.cell(col_widths[i], 8, col, border=1, fill=True)
-    pdf.ln()
-
-    pdf.set_font("Arial", size=8)
-
-    # Rows with neat wrapping
-    for _, row in df.iterrows():
-        row_values = [str(v) for v in row]
-
-        heights = []
-        for i, value in enumerate(row_values):
-            lines = pdf.multi_cell(col_widths[i], 5, value, border=0, split_only=True)
-            heights.append(len(lines) * 5)
-        max_height = max(heights)
-
-        for i, value in enumerate(row_values):
-            pdf.multi_cell(col_widths[i], 5, value, border=1)
-        pdf.ln(max_height)
-
-    return pdf.output(dest="S").encode("latin-1", "replace")
 
 
 # ---------------- WORD EXPORT (PREMIUM FORMAT) ----------------
