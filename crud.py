@@ -22,9 +22,9 @@ def add_job(company, job_title, country, salary, currency, visa, job_url, applic
     c = conn.cursor()
 
     c.execute("""
-        INSERT INTO jobs (company, job_title, country, salary, currency, visa, job_url, application_date, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (company, job_title, country, salary, currency, visa, job_url, application_date, status))
+        INSERT INTO jobs (company, job_title, country, salary, currency, visa, job_url, application_date, status, user_email)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (company, job_title, country, salary, currency, visa, job_url, application_date, status, user_email))
 
     conn.commit()
     conn.close()
@@ -37,10 +37,13 @@ def get_all_jobs(user_email):
     c = conn.cursor()
 
     c.execute("""
-        SELECT * FROM jobs
-    """)
-    rows = c.fetchall()
+        SELECT id, company, job_title, country, salary, currency, visa, job_url, application_date, status
+        FROM jobs
+        WHERE user_email = ?
+        ORDER BY id DESC
+    """, (user_email,))
 
+    rows = c.fetchall()
     conn.close()
     return rows
 
@@ -49,9 +52,13 @@ def get_job_by_id(job_id):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute("SELECT * FROM jobs WHERE id=?", (job_id,))
-    row = c.fetchone()
+    c.execute("""
+        SELECT id, company, job_title, country, salary, currency, visa, job_url, application_date, status
+        FROM jobs
+        WHERE id=?
+    """, (job_id,))
 
+    row = c.fetchone()
     conn.close()
     return row
 
