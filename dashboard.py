@@ -40,7 +40,7 @@ def get_metrics(df):
         "offer_rate": offer_rate,
     }
 
-# ---------------- ADMIN DASHBOARD ----------------
+# ---------------- ADMIN HELPERS ----------------
 def get_all_users():
     conn = get_connection()
     c = conn.cursor()
@@ -64,21 +64,29 @@ def get_logs():
     conn.close()
     return rows
 
+# ---------------- ADMIN DASHBOARD ----------------
 def admin_dashboard():
     st.title("👑 Admin Dashboard")
 
-    # Back to Home button
+    # ---------------- BACK TO HOME BUTTON ----------------
     back_col, _, _, _ = st.columns([1, 3, 1, 1])
     with back_col:
         if st.button("← Back to Home", key="admin_back_home"):
-            for key in ["user_id", "user_email", "user_name", "role", "show_admin_login"]:
-                if key in st.session_state:
-                    del st.session_state[key]
+            # Remove only navigation flags
+            if "show_admin_login" in st.session_state:
+                del st.session_state["show_admin_login"]
+
+            # NOTE: Admin logout नको असेल तर खालील code uncomment करू नकोस
+            # for key in ["user_id", "user_email", "user_name", "role"]:
+            #     if key in st.session_state:
+            #         del st.session_state[key]
+
             st.rerun()
 
+    # ---------------- TABS ----------------
     tab1, tab2 = st.tabs(["Users", "Activity Logs"])
 
-    # USERS TAB
+    # ---------------- USERS TAB ----------------
     with tab1:
         st.subheader("Registered Users")
 
@@ -107,7 +115,7 @@ def admin_dashboard():
                 st.success("User status updated successfully!")
                 st.rerun()
 
-    # LOGS TAB
+    # ---------------- LOGS TAB ----------------
     with tab2:
         st.subheader("Activity Logs")
 
