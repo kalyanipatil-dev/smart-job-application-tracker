@@ -220,7 +220,7 @@ else:
 
 excel_bytes = export_excel(filtered_df)
 
-    ec1, ec2, ec3, ec4 = st.columns(4)
+ec1, ec2, ec3, ec4 = st.columns(4)
 
     ec1.download_button(
         "Download CSV",
