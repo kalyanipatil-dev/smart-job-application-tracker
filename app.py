@@ -66,7 +66,7 @@ if not df.empty:
 else:
     st.info("No applications yet. Add a job to see dashboard metrics.")
 
-# ---------------- Add New Job (existing preserved) ----------------
+# ---------------- Add New Job ----------------
 st.sidebar.header("Add New Job")
 
 company = st.sidebar.text_input("Company")
@@ -214,36 +214,27 @@ st.header("📤 Export Applications")
 if filtered_df.empty:
     st.info("No data to export.")
 else:
-    csv_data = export_csv(filtered_df)
     pdf_data = export_pdf(filtered_df)
     word_data = export_word(filtered_df)
+    excel_bytes = export_excel(filtered_df)
 
-excel_bytes = export_excel(filtered_df)
+    ec1, ec2, ec3 = st.columns(3)
 
-ec1, ec2, ec3, ec4 = st.columns(4)
-
-ec1.download_button(
-        "Download CSV",
-        data=csv_data,
-        file_name="applications.csv",
-        mime="text/csv",
-    )
-
-ec2.download_button(
+    ec1.download_button(
         "Download Excel",
         data=excel_bytes,
         file_name="applications.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-ec3.download_button(
+    ec2.download_button(
         "Download PDF",
         data=pdf_data,
         file_name="applications.pdf",
         mime="application/pdf",
     )
 
-ec4.download_button(
+    ec3.download_button(
         "Download Word",
         data=word_data,
         file_name="applications.docx",
