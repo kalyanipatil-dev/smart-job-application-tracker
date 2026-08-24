@@ -16,13 +16,19 @@ def main():
     # ---------------- HEADER BAR (Back + Admin) ----------------
     col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
 
-    # BACK BUTTON → फक्त logged-in असताना
-    if "user_email" in st.session_state:
+    # BACK BUTTON → user + admin दोघांसाठी
+    if "user_email" in st.session_state or st.session_state.get("role") == "admin":
         with col1:
             if st.button("← Back"):
-                for key in ["user_email", "user_id", "user_name", "role"]:
-                    if key in st.session_state:
-                        del st.session_state[key]
+                # फक्त navigation flags clear करायचे
+                if "show_admin_login" in st.session_state:
+                    del st.session_state["show_admin_login"]
+
+                # Admin logout नको असेल तर खालील uncomment करू नकोस
+                # for key in ["user_email", "user_id", "user_name", "role"]:
+                #     if key in st.session_state:
+                #         del st.session_state[key]
+
                 st.rerun()
 
     # ADMIN BUTTON → नेहमी दिसेल
@@ -45,7 +51,7 @@ def main():
         else:
             admin_normal_login()
 
-        st.stop()   # IMPORTANT: prevent duplicate widgets
+        st.stop()   # Prevent duplicate widgets
 
     # ---------------- USER / SIGNUP ROUTING ----------------
     if "user_email" not in st.session_state:
@@ -75,37 +81,21 @@ def main():
 
     rows = get_all_jobs(user_email)
 
-    if rows:
-        df = pd.DataFrame(
-            rows,
-            columns=[
-                "ID",
-                "Company",
-                "Job Title",
-                "Country",
-                "Salary",
-                "Currency",
-                "Visa",
-                "Job URL",
-                "Application Date",
-                "Status",
-            ],
-        )
-    else:
-        df = pd.DataFrame(
-            columns=[
-                "ID",
-                "Company",
-                "Job Title",
-                "Country",
-                "Salary",
-                "Currency",
-                "Visa",
-                "Job URL",
-                "Application Date",
-                "Status",
-            ]
-        )
+    df = pd.DataFrame(
+        rows,
+        columns=[
+            "ID",
+            "Company",
+            "Job Title",
+            "Country",
+            "Salary",
+            "Currency",
+            "Visa",
+            "Job URL",
+            "Application Date",
+            "Status",
+        ],
+    )
 
     # ---------------- Dashboard ----------------
     st.header("📊 Dashboard")
