@@ -1,24 +1,32 @@
 import pandas as pd
 
-# SEARCH FUNCTION
+# ---------------- SEARCH FILTER ----------------
 def apply_search(df, query):
     if not query:
         return df
+
     query = query.lower()
+
     return df[
-        df["Company"].str.lower().str.contains(query) |
-        df["Job Title"].str.lower().str.contains(query) |
-        df["Country"].str.lower().str.contains(query)
+        df["Company"].str.lower().str.contains(query, na=False)
+        | df["Job Title"].str.lower().str.contains(query, na=False)
+        | df["Country"].str.lower().str.contains(query, na=False)
     ]
 
-# FILTER FUNCTION
+# ---------------- ADVANCED FILTERS ----------------
 def apply_filters(df, country, status, visa, currency):
+    filtered = df.copy()
+
     if country != "All":
-        df = df[df["Country"] == country]
+        filtered = filtered[filtered["Country"] == country]
+
     if status != "All":
-        df = df[df["Status"] == status]
+        filtered = filtered[filtered["Status"] == status]
+
     if visa != "All":
-        df = df[df["Visa"] == visa]
+        filtered = filtered[filtered["Visa"] == visa]
+
     if currency != "All":
-        df = df[df["Currency"] == currency]
-    return df
+        filtered = filtered[filtered["Currency"] == currency]
+
+    return filtered
