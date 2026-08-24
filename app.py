@@ -13,17 +13,19 @@ init_db()
 
 def main():
 
-    # ---------------- HEADER BAR (Back + Admin) ----------------
+    # ---------------- HEADER BAR (Admin button only) ----------------
     col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
 
-    with col1:
-        if st.button("← Back"):
-            # Simple back: clear session and reload to home
-            for key in ["user_email", "user_id", "user_name", "role"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.rerun()
+    # BACK BUTTON → फक्त logged-in असताना
+    if "user_email" in st.session_state:
+        with col1:
+            if st.button("← Back"):
+                for key in ["user_email", "user_id", "user_name", "role"]:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.rerun()
 
+    # ADMIN BUTTON → नेहमी दिसेल
     with col4:
         admin_clicked = st.button("Admin", key="admin_header_button")
 
@@ -32,7 +34,6 @@ def main():
 
     # ---------------- ADMIN LOGIN FLOW ----------------
     if st.session_state.get("show_admin_login"):
-        # Decide first-login vs normal-login
         conn = get_connection()
         c = conn.cursor()
         c.execute("SELECT id, first_login FROM users WHERE role='admin' LIMIT 1")
@@ -44,7 +45,7 @@ def main():
         else:
             admin_normal_login()
 
-        return
+        st.stop()   # 🔥 IMPORTANT FIX
 
     # ---------------- USER / SIGNUP ROUTING ----------------
     if "user_email" not in st.session_state:
@@ -72,7 +73,6 @@ def main():
     # ---------------- USER DASHBOARD ----------------
     st.title("📌 Smart Job Application Tracker")
 
-    # Load user-specific jobs
     rows = get_all_jobs(user_email)
 
     if rows:
