@@ -206,7 +206,7 @@ if not filtered_df.empty:
                     if confirm:
                         delete_job(_id)
                         st.success("Job deleted successfully!")
-                       st.rerun()
+                        st.rerun()
 
 # ---------------- Export ----------------
 st.header("📤 Export Applications")
