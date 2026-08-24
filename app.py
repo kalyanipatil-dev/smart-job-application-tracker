@@ -214,6 +214,22 @@ st.header("📤 Export Applications")
 if filtered_df.empty:
     st.info("No data to export.")
 else:
+    # Export साठी columns fix करून देतो (ID सहित 10 columns)
+    filtered_df = filtered_df[
+        [
+            "ID",
+            "Company",
+            "Job Title",
+            "Country",
+            "Salary",
+            "Currency",
+            "Visa",
+            "Job URL",
+            "Application Date",
+            "Status",
+        ]
+    ]
+
     pdf_data = export_pdf(filtered_df)
     word_data = export_word(filtered_df)
     excel_bytes = export_excel(filtered_df)
