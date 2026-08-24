@@ -214,7 +214,7 @@ st.header("📤 Export Applications")
 if filtered_df.empty:
     st.info("No data to export.")
 else:
-    # Export साठी columns fix करून देतो (ID सहित 10 columns)
+    # Ensure all columns exist (10 columns)
     filtered_df = filtered_df[
         [
             "ID",
