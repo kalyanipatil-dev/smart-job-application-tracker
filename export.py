@@ -52,64 +52,64 @@ def export_excel(df):
     return final_output.getvalue()
 
 
-# ---------------- PDF EXPORT (PREMIUM FORMATTING) ----------------
+# ---------------- PDF EXPORT (WORD-STYLE PREMIUM FORMAT) ----------------
 def export_pdf(df):
     pdf = FPDF()
     pdf.add_page()
 
     # Title centered
     pdf.set_text_color(0, 0, 180)
-    pdf.set_font("Arial", "B", 20)
-    pdf.cell(0, 12, txt="Smart Job Application Tracker", ln=True, align="C")
-    pdf.ln(6)
-
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, txt="Job Applications", ln=True, align="L")
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, txt="Smart Job Application Tracker", ln=True, align="C")
     pdf.ln(4)
 
-    # Balanced column widths
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 8, txt="Job Applications", ln=True, align="L")
+    pdf.ln(3)
+
+    # Balanced column widths (Word-style)
     col_widths = [
         12,  # ID
-        30,  # Company
+        28,  # Company
         45,  # Job Title
-        25,  # Country
-        20,  # Salary
-        20,  # Currency
+        22,  # Country
+        18,  # Salary
+        18,  # Currency
         15,  # Visa
         60,  # Job URL
-        28,  # Application Date
+        26,  # Application Date
         20   # Status
     ]
 
     pdf.set_fill_color(230, 230, 230)
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "B", 11)
+    pdf.set_font("Arial", "B", 8)
 
-    # Header
+    # Header row
     for i, col in enumerate(df.columns):
-        pdf.cell(col_widths[i], 10, col, border=1, fill=True)
+        pdf.cell(col_widths[i], 8, col, border=1, fill=True)
     pdf.ln()
 
-    pdf.set_font("Arial", size=10)
+    pdf.set_font("Arial", size=8)
 
-    # Rows
+    # Rows with neat wrapping
     for _, row in df.iterrows():
         row_values = [str(v) for v in row]
 
         heights = []
         for i, value in enumerate(row_values):
-            lines = pdf.multi_cell(col_widths[i], 6, value, border=0, split_only=True)
-            heights.append(len(lines) * 6)
+            lines = pdf.multi_cell(col_widths[i], 5, value, border=0, split_only=True)
+            heights.append(len(lines) * 5)
         max_height = max(heights)
 
         for i, value in enumerate(row_values):
-            pdf.multi_cell(col_widths[i], 6, value, border=1)
+            pdf.multi_cell(col_widths[i], 5, value, border=1)
         pdf.ln(max_height)
 
     return pdf.output(dest="S").encode("latin-1", "replace")
 
 
-# ---------------- WORD EXPORT (PREMIUM FORMATTING) ----------------
+# ---------------- WORD EXPORT (PREMIUM FORMAT) ----------------
 def export_word(df):
     doc = Document()
 
