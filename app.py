@@ -235,4 +235,19 @@ else:
         "Download Excel",
         data=excel_bytes,
         file_name="applications.xlsx",
-        mime="application/vnd
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    ec3.download_button(
+        "Download PDF",
+        data=pdf_data,
+        file_name="applications.pdf",
+        mime="application/pdf",
+    )
+
+    ec4.download_button(
+        "Download Word",
+        data=word_data,
+        file_name="applications.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
