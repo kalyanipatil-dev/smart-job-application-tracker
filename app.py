@@ -1,24 +1,16 @@
 import streamlit as st
 import pandas as pd
 
-# ---------------- AUTH IMPORTS ----------------
 from auth import signup_form, login_form
-
-# ---------------- EXISTING IMPORTS ----------------
 from crud import add_job, get_all_jobs, get_job_by_id, update_job, delete_job
 from filters import apply_search, apply_filters
 from export import export_excel, export_word
-from dashboard import get_metrics, admin_dashboard   # admin dashboard added
-from analytics import chart_status, chart_country, chart_visa, chart_time
-from database import create_tables
+from dashboard import get_metrics, admin_dashboard
+from database import get_connection
 
-# ---------------- INIT DB ----------------
-create_tables()
-
-# ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Job Application Tracker", layout="wide")
 
-# ---------------- ROUTING (NEW) ----------------
+# ---------------- ROUTING ----------------
 def main():
 
     # If NOT logged in → show signup/login
@@ -33,22 +25,22 @@ def main():
         with tab2:
             login_form()
 
-        return   # STOP here (do not load job tracker)
+        return
 
     # If logged in → check role
     role = st.session_state.get("role", "user")
+    user_email = st.session_state.get("user_email")
 
     # ---------------- ADMIN DASHBOARD ----------------
     if role == "admin":
         admin_dashboard()
         return
 
-    # ---------------- USER DASHBOARD (YOUR EXISTING CODE) ----------------
-
+    # ---------------- USER DASHBOARD ----------------
     st.title("📌 Smart Job Application Tracker")
 
-    # ---------------- Load Data ----------------
-    rows = get_all_jobs()
+    # Load user-specific jobs
+    rows = get_all_jobs(user_email)
 
     if rows:
         df = pd.DataFrame(
@@ -132,6 +124,7 @@ def main():
                 job_url,
                 str(application_date),
                 status,
+                user_email
             )
             st.sidebar.success("Job saved successfully!")
             st.rerun()
@@ -233,6 +226,7 @@ def main():
                             e_job_url,
                             str(e_application_date),
                             e_status,
+                            user_email
                         )
                         st.success("Job updated successfully!")
                         st.rerun()
@@ -240,7 +234,7 @@ def main():
                     if delete_clicked:
                         confirm = st.checkbox("Confirm delete", value=False)
                         if confirm:
-                            delete_job(_id)
+                            delete_job(_id, user_email)
                             st.success("Job deleted successfully!")
                             st.rerun()
 
@@ -285,6 +279,5 @@ def main():
         )
 
 
-# ---------------- RUN APP ----------------
 if __name__ == "__main__":
     main()
