@@ -3,13 +3,17 @@ from fpdf import FPDF
 from docx import Document
 from docx.shared import Pt
 from io import BytesIO
+from openpyxl.styles import PatternFill
+from openpyxl import load_workbook
 
-# ---------------- EXCEL EXPORT (Two Sheets: Applications + Summary) ----------------
+# ---------------- EXCEL EXPORT (Two Sheets + Conditional Formatting) ----------------
 def export_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        # Sheet 1: Applications
         df.to_excel(writer, index=False, sheet_name="Applications")
 
+        # Sheet 2: Summary Dashboard
         summary = pd.DataFrame({
             "Metric": ["Total", "Saved", "Applied", "Assessment", "Interview", "Offer", "Rejected"],
             "Count": [
@@ -25,10 +29,33 @@ def export_excel(df):
 
         summary.to_excel(writer, index=False, sheet_name="Summary")
 
-    return output.getvalue()
+    # Apply conditional formatting
+    output.seek(0)
+    wb = load_workbook(output)
+    ws = wb["Summary"]
+
+    color_map = {
+        "Saved": "ADD8E6",       # Light Blue
+        "Applied": "FFA500",     # Orange
+        "Assessment": "FFFF00",  # Yellow
+        "Interview": "00BFFF",   # Deep Sky Blue
+        "Offer": "90EE90",       # Light Green
+        "Rejected": "FF7F7F"     # Light Red
+    }
+
+    for row in ws.iter_rows(min_row=2, max_row=8, min_col=1, max_col=2):
+        metric = row[0].value
+        if metric in color_map:
+            fill = PatternFill(start_color=color_map[metric], end_color=color_map[metric], fill_type="solid")
+            for cell in row:
+                cell.fill = fill
+
+    final_output = BytesIO()
+    wb.save(final_output)
+    return final_output.getvalue()
 
 
-# ---------------- PDF EXPORT (Color + Table Format) ----------------
+# ---------------- PDF EXPORT (Color + Multi-line Wrapping + Table Format) ----------------
 def export_pdf(df):
     pdf = FPDF()
     pdf.add_page()
@@ -39,7 +66,7 @@ def export_pdf(df):
     pdf.cell(200, 12, txt="Job Applications", ln=True)
     pdf.ln(4)
 
-    # Column widths
+    # Column widths (adjustable)
     col_widths = [35, 45, 25, 20, 20, 25, 60, 25, 25]
 
     # Header background
@@ -52,17 +79,28 @@ def export_pdf(df):
         pdf.cell(col_widths[i], 10, col, border=1, fill=True)
     pdf.ln()
 
-    # Rows
+    # Rows with multi-line wrapping
     pdf.set_font("Arial", size=11)
     for _, row in df.iterrows():
-        for i, value in enumerate(row):
-            pdf.cell(col_widths[i], 10, str(value), border=1)
-        pdf.ln()
+        max_height = 10
+        row_values = [str(v) for v in row]
+
+        # Calculate max height for wrapped text
+        heights = []
+        for i, value in enumerate(row_values):
+            lines = pdf.multi_cell(col_widths[i], 10, value, border=0, split_only=True)
+            heights.append(len(lines) * 10)
+        max_height = max(heights)
+
+        # Print wrapped cells
+        for i, value in enumerate(row_values):
+            pdf.multi_cell(col_widths[i], 10, value, border=1, max_line_height=10)
+        pdf.ln(max_height)
 
     return pdf.output(dest="S").encode("latin-1", "replace")
 
 
-# ---------------- WORD EXPORT (Header + Footer + Calibri Table) ----------------
+# ---------------- WORD EXPORT (Header + Footer + Auto-fit Table + Calibri Font) ----------------
 def export_word(df):
     doc = Document()
 
@@ -89,8 +127,10 @@ def export_word(df):
 
     # Table
     table = doc.add_table(rows=1, cols=len(df.columns))
+    table.autofit = True
     hdr_cells = table.rows[0].cells
 
+    # Header formatting
     for i, col in enumerate(df.columns):
         hdr_cells[i].text = col
         run = hdr_cells[i].paragraphs[0].runs[0]
@@ -98,6 +138,7 @@ def export_word(df):
         run.font.size = Pt(12)
         run.bold = True
 
+    # Rows
     for _, row in df.iterrows():
         row_cells = table.add_row().cells
         for i, value in enumerate(row):
