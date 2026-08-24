@@ -38,6 +38,16 @@ def main():
     if admin_clicked:
         st.session_state["show_admin_login"] = True
 
+    # TEMPORARY ADMIN RESET BUTTON (SAFE & COMPATIBLE)
+   with st.sidebar:
+    if st.button("Reset Admin First Login (TEMP)"):
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("UPDATE users SET first_login = 1 WHERE role='admin'")
+        conn.commit()
+        conn.close()
+        st.success("Admin first_login reset! Click Admin again.")
+    
     # ---------------- ADMIN LOGIN FLOW ----------------
     if st.session_state.get("show_admin_login"):
         conn = get_connection()
