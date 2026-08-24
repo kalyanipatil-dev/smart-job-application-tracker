@@ -35,12 +35,12 @@ def export_excel(df):
     ws = wb["Summary"]
 
     color_map = {
-        "Saved": "ADD8E6",       # Light Blue
-        "Applied": "FFA500",     # Orange
-        "Assessment": "FFFF00",  # Yellow
-        "Interview": "00BFFF",   # Deep Sky Blue
-        "Offer": "90EE90",       # Light Green
-        "Rejected": "FF7F7F"     # Light Red
+        "Saved": "ADD8E6",
+        "Applied": "FFA500",
+        "Assessment": "FFFF00",
+        "Interview": "00BFFF",
+        "Offer": "90EE90",
+        "Rejected": "FF7F7F"
     }
 
     for row in ws.iter_rows(min_row=2, max_row=8, min_col=1, max_col=2):
@@ -66,8 +66,19 @@ def export_pdf(df):
     pdf.cell(200, 12, txt="Job Applications", ln=True)
     pdf.ln(4)
 
-    # Column widths (adjustable)
-    col_widths = [35, 45, 25, 20, 20, 25, 60, 25, 25]
+    # FIXED: 10 column widths (matching df)
+    col_widths = [
+        20,  # ID
+        35,  # Company
+        45,  # Job Title
+        25,  # Country
+        20,  # Salary
+        20,  # Currency
+        20,  # Visa
+        60,  # Job URL
+        30,  # Application Date
+        25   # Status
+    ]
 
     # Header background
     pdf.set_fill_color(230, 230, 230)
