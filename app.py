@@ -218,9 +218,7 @@ else:
     pdf_data = export_pdf(filtered_df)
     word_data = export_word(filtered_df)
 
-    export_excel(filtered_df)
-    with open("applications.xlsx", "rb") as f:
-        excel_bytes = f.read()
+excel_bytes = export_excel(filtered_df)
 
     ec1, ec2, ec3, ec4 = st.columns(4)
 
