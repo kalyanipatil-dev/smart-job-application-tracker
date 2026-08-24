@@ -13,7 +13,7 @@ init_db()
 
 def main():
 
-    # ---------------- HEADER BAR (Admin button only) ----------------
+    # ---------------- HEADER BAR (Back + Admin) ----------------
     col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
 
     # BACK BUTTON → फक्त logged-in असताना
@@ -45,7 +45,7 @@ def main():
         else:
             admin_normal_login()
 
-        st.stop()   # 🔥 IMPORTANT FIX
+        st.stop()   # IMPORTANT: prevent duplicate widgets
 
     # ---------------- USER / SIGNUP ROUTING ----------------
     if "user_email" not in st.session_state:
