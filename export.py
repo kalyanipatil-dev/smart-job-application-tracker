@@ -1,7 +1,7 @@
 import pandas as pd
 from fpdf import FPDF
 from docx import Document
-from docx.shared import Pt
+from docx.shared import Pt, Inches
 from io import BytesIO
 from openpyxl.styles import PatternFill
 from openpyxl import load_workbook
@@ -52,40 +52,45 @@ def export_excel(df):
     return final_output.getvalue()
 
 
-# ---------------- PDF EXPORT (FPDF FIXED) ----------------
+# ---------------- PDF EXPORT (PREMIUM FORMATTING) ----------------
 def export_pdf(df):
     pdf = FPDF()
     pdf.add_page()
 
+    # Title centered
     pdf.set_text_color(0, 0, 180)
-    pdf.set_font("Arial", "B", 18)
-    pdf.cell(200, 12, txt="Job Applications", ln=True)
+    pdf.set_font("Arial", "B", 20)
+    pdf.cell(0, 12, txt="Smart Job Application Tracker", ln=True, align="C")
+    pdf.ln(6)
+
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, txt="Job Applications", ln=True, align="L")
     pdf.ln(4)
 
-    # 10 columns width
+    # Balanced column widths
     col_widths = [
-        20,  # ID
-        35,  # Company
+        12,  # ID
+        30,  # Company
         45,  # Job Title
         25,  # Country
         20,  # Salary
         20,  # Currency
-        20,  # Visa
+        15,  # Visa
         60,  # Job URL
-        30,  # Application Date
-        25   # Status
+        28,  # Application Date
+        20   # Status
     ]
 
     pdf.set_fill_color(230, 230, 230)
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "B", 12)
+    pdf.set_font("Arial", "B", 11)
 
     # Header
     for i, col in enumerate(df.columns):
         pdf.cell(col_widths[i], 10, col, border=1, fill=True)
     pdf.ln()
 
-    pdf.set_font("Arial", size=11)
+    pdf.set_font("Arial", size=10)
 
     # Rows
     for _, row in df.iterrows():
@@ -93,18 +98,18 @@ def export_pdf(df):
 
         heights = []
         for i, value in enumerate(row_values):
-            lines = pdf.multi_cell(col_widths[i], 10, value, border=0, split_only=True)
-            heights.append(len(lines) * 10)
+            lines = pdf.multi_cell(col_widths[i], 6, value, border=0, split_only=True)
+            heights.append(len(lines) * 6)
         max_height = max(heights)
 
         for i, value in enumerate(row_values):
-            pdf.multi_cell(col_widths[i], 10, value, border=1)
+            pdf.multi_cell(col_widths[i], 6, value, border=1)
         pdf.ln(max_height)
 
     return pdf.output(dest="S").encode("latin-1", "replace")
 
 
-# ---------------- WORD EXPORT (NO add_field — FIXED) ----------------
+# ---------------- WORD EXPORT (PREMIUM FORMATTING) ----------------
 def export_word(df):
     doc = Document()
 
@@ -114,24 +119,28 @@ def export_word(df):
     header_p = header.paragraphs[0]
     header_p.text = "Smart Job Application Tracker"
     header_p.style.font.name = "Calibri"
-    header_p.style.font.size = Pt(12)
+    header_p.style.font.size = Pt(14)
 
-    # Footer (FIXED — remove add_field)
+    # Footer
     footer = section.footer
     footer_p = footer.paragraphs[0]
-    footer_p.text = "Page"   # Streamlit Cloud docx version does NOT support add_field()
-
+    footer_p.text = "Generated Report"
     footer_p.style.font.name = "Calibri"
     footer_p.style.font.size = Pt(11)
 
     # Title
     title = doc.add_heading("Job Applications", level=1)
     title.style.font.name = "Calibri"
-    title.style.font.size = Pt(20)
+    title.style.font.size = Pt(22)
 
     # Table
     table = doc.add_table(rows=1, cols=len(df.columns))
-    table.autofit = True
+    table.style = "Table Grid"
+
+    # Auto-fit margins
+    section.left_margin = Inches(0.5)
+    section.right_margin = Inches(0.5)
+
     hdr_cells = table.rows[0].cells
 
     for i, col in enumerate(df.columns):
