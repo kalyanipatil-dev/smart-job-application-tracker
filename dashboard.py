@@ -2,18 +2,31 @@ import streamlit as st
 import pandas as pd
 from database import get_connection
 
-# ---------------- USER METRICS (YOUR EXISTING CODE) ----------------
+# ---------------- USER METRICS ----------------
 def get_metrics(df):
-    total = len(df)
-    saved = len(df[df["Status"] == "Saved"])
-    applied = len(df[df["Status"] == "Applied"])
-    assessment = len(df[df["Status"] == "Assessment"])
-    interview = len(df[df["Status"] == "Interview"])
-    offer = len(df[df["Status"] == "Offer"])
-    rejected = len(df[df["Status"] == "Rejected"])
+    if df.empty:
+        return {
+            "total": 0,
+            "saved": 0,
+            "applied": 0,
+            "assessment": 0,
+            "interview": 0,
+            "offer": 0,
+            "rejected": 0,
+            "interview_rate": 0,
+            "offer_rate": 0,
+        }
 
-    interview_rate = (interview / total * 100) if total else 0
-    offer_rate = (offer / total * 100) if total else 0
+    total = len(df)
+    saved = (df["Status"] == "Saved").sum()
+    applied = (df["Status"] == "Applied").sum()
+    assessment = (df["Status"] == "Assessment").sum()
+    interview = (df["Status"] == "Interview").sum()
+    offer = (df["Status"] == "Offer").sum()
+    rejected = (df["Status"] == "Rejected").sum()
+
+    interview_rate = (interview / total) * 100 if total else 0
+    offer_rate = (offer / total) * 100 if total else 0
 
     return {
         "total": total,
@@ -24,106 +37,74 @@ def get_metrics(df):
         "offer": offer,
         "rejected": rejected,
         "interview_rate": interview_rate,
-        "offer_rate": offer_rate
+        "offer_rate": offer_rate,
     }
 
-# ---------------- USER DASHBOARD WRAPPER ----------------
-def user_dashboard():
-    st.title("📌 Smart Job Application Tracker (User Dashboard)")
-    st.info("User logged in. Your job tracking dashboard is active.")
-    # Actual UI is inside app.py (we don't duplicate it here)
-    # app.py handles full user UI
+# ---------------- ADMIN: GET USERS ----------------
+def get_all_users():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, name, email, role, status FROM users")
+    rows = c.fetchall()
+    conn.close()
+    return rows
 
+# ---------------- ADMIN: UPDATE USER STATUS ----------------
+def update_user_status(user_id, new_status):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET status=? WHERE id=?", (new_status, user_id))
+    conn.commit()
+    conn.close()
+
+# ---------------- ADMIN: GET LOGS ----------------
+def get_logs():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT user_email, action, details, timestamp FROM logs ORDER BY id DESC")
+    rows = c.fetchall()
+    conn.close()
+    return rows
 
 # ---------------- ADMIN DASHBOARD ----------------
 def admin_dashboard():
     st.title("👑 Admin Dashboard")
 
-    conn = get_connection()
-    c = conn.cursor()
+    tab1, tab2 = st.tabs(["Users", "Activity Logs"])
 
-    # ---------------- USER COUNT METRICS ----------------
-    c.execute("SELECT COUNT(*) FROM users")
-    total_users = c.fetchone()[0]
+    # ---------------- USERS TAB ----------------
+    with tab1:
+        st.subheader("Registered Users")
 
-    c.execute("SELECT COUNT(*) FROM users WHERE status='active'")
-    active_users = c.fetchone()[0]
+        users = get_all_users()
+        df_users = pd.DataFrame(users, columns=["ID", "Name", "Email", "Role", "Status"])
 
-    c.execute("SELECT COUNT(*) FROM users WHERE status='inactive'")
-    inactive_users = c.fetchone()[0]
+        st.dataframe(df_users, use_container_width=True)
 
-    c.execute("SELECT COUNT(*) FROM users WHERE role='user'")
-    normal_users = c.fetchone()[0]
+        st.subheader("Update User Status")
 
-    c.execute("SELECT COUNT(*) FROM users WHERE role='admin'")
-    admin_count = c.fetchone()[0]
+        user_ids = df_users["ID"].tolist()
+        selected_id = st.selectbox("Select User ID", user_ids)
 
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Total Users", total_users)
-    m2.metric("Active Users", active_users)
-    m3.metric("Inactive Users", inactive_users)
-    m4.metric("Normal Users", normal_users)
-    m5.metric("Admins", admin_count)
+        selected_user = df_users[df_users["ID"] == selected_id].iloc[0]
+        current_status = selected_user["Status"]
 
-    st.divider()
-
-    # ---------------- USER LIST ----------------
-    st.header("👥 All Users")
-
-    c.execute("SELECT id, name, email, phone, role, status FROM users")
-    users = c.fetchall()
-
-    df_users = pd.DataFrame(
-        users,
-        columns=["ID", "Name", "Email", "Phone", "Role", "Status"]
-    )
-
-    st.dataframe(df_users, use_container_width=True)
-
-    st.divider()
-
-    # ---------------- DEACTIVATE / ACTIVATE USER ----------------
-    st.header("⚠️ Activate / Deactivate User")
-
-    user_ids = df_users["ID"].tolist()
-    selected_user = st.selectbox("Select User ID", user_ids)
-
-    if selected_user:
-        c.execute("SELECT name, email, status FROM users WHERE id=?", (selected_user,))
-        u_name, u_email, u_status = c.fetchone()
-
-        st.write(f"**Name:** {u_name}")
-        st.write(f"**Email:** {u_email}")
-        st.write(f"**Current Status:** {u_status}")
-
-        if u_status == "active":
-            if st.button("Deactivate User"):
-                c.execute("UPDATE users SET status='inactive' WHERE id=?", (selected_user,))
-                conn.commit()
-                st.success("User deactivated successfully!")
-                st.rerun()
-        else:
-            if st.button("Activate User"):
-                c.execute("UPDATE users SET status='active' WHERE id=?", (selected_user,))
-                conn.commit()
-                st.success("User activated successfully!")
-                st.rerun()
-
-    st.divider()
-
-    # ---------------- ACTIVITY LOGS ----------------
-    st.header("📜 User Activity Logs")
-
-    c.execute("SELECT user_email, action, details, timestamp FROM logs ORDER BY id DESC")
-    logs = c.fetchall()
-
-    if logs:
-        df_logs = pd.DataFrame(
-            logs,
-            columns=["User", "Action", "Details", "Time"]
+        new_status = st.selectbox(
+            "New Status",
+            ["active", "inactive"],
+            index=["active", "inactive"].index(current_status)
         )
-        st.dataframe(df_logs, use_container_width=True)
-    else:
-        st.info("No logs available.")
 
-    conn.close()
+        if st.button("Update Status"):
+            update_user_status(selected_id, new_status)
+            st.success("User status updated successfully!")
+            st.rerun()
+
+    # ---------------- LOGS TAB ----------------
+    with tab2:
+        st.subheader("Activity Logs")
+
+        logs = get_logs()
+        df_logs = pd.DataFrame(logs, columns=["User Email", "Action", "Details", "Timestamp"])
+
+        st.dataframe(df_logs, use_container_width=True)
