@@ -72,11 +72,11 @@ def admin_dashboard():
     back_col, _, _, _ = st.columns([1, 3, 1, 1])
     with back_col:
         if st.button("← Back to Home", key="admin_back_home"):
-            # Remove only navigation flags
+            # फक्त admin navigation flag clear करायचा
             if "show_admin_login" in st.session_state:
                 del st.session_state["show_admin_login"]
 
-            # NOTE: Admin logout नको असेल तर खालील code uncomment करू नकोस
+            # Admin logout नको असेल तर खालील uncomment करू नकोस
             # for key in ["user_id", "user_email", "user_name", "role"]:
             #     if key in st.session_state:
             #         del st.session_state[key]
