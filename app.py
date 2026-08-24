@@ -1,53 +1,48 @@
 import streamlit as st
 import pandas as pd
 
-from auth import signup_form, login_form, get_user
+from auth import signup_form, login_form, admin_first_login, admin_normal_login
 from crud import add_job, get_all_jobs, get_job_by_id, update_job, delete_job
 from filters import apply_search, apply_filters
 from export import export_excel, export_word
 from dashboard import get_metrics, admin_dashboard
-from database import get_connection
+from database import get_connection, init_db
 
 st.set_page_config(page_title="Job Application Tracker", layout="wide")
+init_db()
 
-# ---------------- ROUTING ----------------
 def main():
 
-    # ---------------- HEADER ADMIN BUTTON ----------------
-    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+    # ---------------- HEADER BAR (Back + Admin) ----------------
+    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
+
+    with col1:
+        if st.button("← Back"):
+            # Simple back: clear session and reload to home
+            for key in ["user_email", "user_id", "user_name", "role"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+
     with col4:
         admin_clicked = st.button("Admin", key="admin_header_button")
 
     if admin_clicked:
         st.session_state["show_admin_login"] = True
 
-    # ---------------- ADMIN LOGIN POPUP ----------------
+    # ---------------- ADMIN LOGIN FLOW ----------------
     if st.session_state.get("show_admin_login"):
-        st.sidebar.subheader("Admin Login")
+        # Decide first-login vs normal-login
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("SELECT id, first_login FROM users WHERE role='admin' LIMIT 1")
+        row = c.fetchone()
+        conn.close()
 
-        email = st.sidebar.text_input("Admin Email")
-        password = st.sidebar.text_input("Admin Password", type="password")
-
-        if st.sidebar.button("Login as Admin"):
-            user = get_user(email, password)
-
-            if not user:
-                st.sidebar.error("Invalid admin credentials.")
-            else:
-                _id, name, email, role, status = user
-
-                if role != "admin":
-                    st.sidebar.error("This account is not an admin.")
-                elif status == "inactive":
-                    st.sidebar.error("Admin account is deactivated.")
-                else:
-                    st.session_state["user_id"] = _id
-                    st.session_state["user_name"] = name
-                    st.session_state["user_email"] = email
-                    st.session_state["role"] = role
-                    st.session_state["show_admin_login"] = False
-                    st.success("Admin logged in successfully!")
-                    st.rerun()
+        if row and row[1] == 1:
+            admin_first_login()
+        else:
+            admin_normal_login()
 
         return
 
