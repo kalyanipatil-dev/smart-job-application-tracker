@@ -3,7 +3,7 @@ import pandas as pd
 
 from crud import add_job, get_all_jobs, get_job_by_id, update_job, delete_job
 from filters import apply_search, apply_filters
-from export import export_excel, export_pdf, export_word
+from export import export_excel, export_word   # PDF removed
 from dashboard import get_metrics
 from analytics import chart_status, chart_country, chart_visa, chart_time
 
@@ -214,7 +214,6 @@ st.header("📤 Export Applications")
 if filtered_df.empty:
     st.info("No data to export.")
 else:
-    # Ensure all columns exist (10 columns)
     filtered_df = filtered_df[
         [
             "ID",
@@ -230,11 +229,10 @@ else:
         ]
     ]
 
-    pdf_data = export_pdf(filtered_df)
     word_data = export_word(filtered_df)
     excel_bytes = export_excel(filtered_df)
 
-    ec1, ec2, ec3 = st.columns(3)
+    ec1, ec2 = st.columns(2)
 
     ec1.download_button(
         "Download Excel",
@@ -244,13 +242,6 @@ else:
     )
 
     ec2.download_button(
-        "Download PDF",
-        data=pdf_data,
-        file_name="applications.pdf",
-        mime="application/pdf",
-    )
-
-    ec3.download_button(
         "Download Word",
         data=word_data,
         file_name="applications.docx",
