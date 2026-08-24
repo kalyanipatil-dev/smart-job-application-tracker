@@ -5,9 +5,11 @@ from io import BytesIO
 from openpyxl.styles import PatternFill
 from openpyxl import load_workbook
 
-# ---------------- EXCEL EXPORT ----------------
+# ---------------- EXCEL EXPORT (Two Sheets + Conditional Formatting) ----------------
 def export_excel(df):
     output = BytesIO()
+
+    # Write Applications + Summary sheets
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Applications")
 
@@ -15,28 +17,29 @@ def export_excel(df):
             "Metric": ["Total", "Saved", "Applied", "Assessment", "Interview", "Offer", "Rejected"],
             "Count": [
                 len(df),
-                (df["Status"]=="Saved").sum(),
-                (df["Status"]=="Applied").sum(),
-                (df["Status"]=="Assessment").sum(),
-                (df["Status"]=="Interview").sum(),
-                (df["Status"]=="Offer").sum(),
-                (df["Status"]=="Rejected").sum(),
+                (df["Status"] == "Saved").sum(),
+                (df["Status"] == "Applied").sum(),
+                (df["Status"] == "Assessment").sum(),
+                (df["Status"] == "Interview").sum(),
+                (df["Status"] == "Offer").sum(),
+                (df["Status"] == "Rejected").sum(),
             ]
         })
 
         summary.to_excel(writer, index=False, sheet_name="Summary")
 
+    # Apply conditional formatting
     output.seek(0)
     wb = load_workbook(output)
     ws = wb["Summary"]
 
     color_map = {
-        "Saved": "ADD8E6",
-        "Applied": "FFA500",
-        "Assessment": "FFFF00",
-        "Interview": "00BFFF",
-        "Offer": "90EE90",
-        "Rejected": "FF7F7F"
+        "Saved": "ADD8E6",       # Light Blue
+        "Applied": "FFA500",     # Orange
+        "Assessment": "FFFF00",  # Yellow
+        "Interview": "00BFFF",   # Deep Sky Blue
+        "Offer": "90EE90",       # Light Green
+        "Rejected": "FF7F7F"     # Light Red
     }
 
     for row in ws.iter_rows(min_row=2, max_row=8, min_col=1, max_col=2):
@@ -51,7 +54,7 @@ def export_excel(df):
     return final_output.getvalue()
 
 
-# ---------------- WORD EXPORT (PREMIUM FORMAT) ----------------
+# ---------------- WORD EXPORT (Premium Format + Header/Footer + Auto-fit) ----------------
 def export_word(df):
     doc = Document()
 
@@ -75,16 +78,17 @@ def export_word(df):
     title.style.font.name = "Calibri"
     title.style.font.size = Pt(22)
 
-    # Table
-    table = doc.add_table(rows=1, cols=len(df.columns))
-    table.style = "Table Grid"
-
     # Auto-fit margins
     section.left_margin = Inches(0.5)
     section.right_margin = Inches(0.5)
 
+    # Table
+    table = doc.add_table(rows=1, cols=len(df.columns))
+    table.style = "Table Grid"
+
     hdr_cells = table.rows[0].cells
 
+    # Header formatting
     for i, col in enumerate(df.columns):
         hdr_cells[i].text = col
         run = hdr_cells[i].paragraphs[0].runs[0]
@@ -92,6 +96,7 @@ def export_word(df):
         run.font.size = Pt(12)
         run.bold = True
 
+    # Rows
     for _, row in df.iterrows():
         row_cells = table.add_row().cells
         for i, value in enumerate(row):
