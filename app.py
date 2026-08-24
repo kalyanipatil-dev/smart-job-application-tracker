@@ -98,7 +98,7 @@ if st.sidebar.button("Save Job"):
             status,
         )
         st.sidebar.success("Job saved successfully!")
-        st.experimental_rerun()
+        st.rerun()
 
 # ---------------- Search & Filters ----------------
 st.header("🔍 Search & Filters")
@@ -199,14 +199,14 @@ if not filtered_df.empty:
                         e_status,
                     )
                     st.success("Job updated successfully!")
-                    st.experimental_rerun()
+                    st.rerun()
 
                 if delete_clicked:
                     confirm = st.checkbox("Confirm delete", value=False)
                     if confirm:
                         delete_job(_id)
                         st.success("Job deleted successfully!")
-                        st.experimental_rerun()
+                       st.rerun()
 
 # ---------------- Export ----------------
 st.header("📤 Export Applications")
