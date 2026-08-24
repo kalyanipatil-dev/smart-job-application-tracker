@@ -222,28 +222,28 @@ excel_bytes = export_excel(filtered_df)
 
 ec1, ec2, ec3, ec4 = st.columns(4)
 
-    ec1.download_button(
+ec1.download_button(
         "Download CSV",
         data=csv_data,
         file_name="applications.csv",
         mime="text/csv",
     )
 
-    ec2.download_button(
+ec2.download_button(
         "Download Excel",
         data=excel_bytes,
         file_name="applications.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-    ec3.download_button(
+ec3.download_button(
         "Download PDF",
         data=pdf_data,
         file_name="applications.pdf",
         mime="application/pdf",
     )
 
-    ec4.download_button(
+ec4.download_button(
         "Download Word",
         data=word_data,
         file_name="applications.docx",
