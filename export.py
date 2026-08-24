@@ -52,7 +52,7 @@ def export_excel(df):
     return final_output.getvalue()
 
 
-# ---------------- PDF EXPORT (FIXED FOR STREAMLIT CLOUD) ----------------
+# ---------------- PDF EXPORT (FPDF FIXED) ----------------
 def export_pdf(df):
     pdf = FPDF()
     pdf.add_page()
@@ -62,7 +62,7 @@ def export_pdf(df):
     pdf.cell(200, 12, txt="Job Applications", ln=True)
     pdf.ln(4)
 
-    # FIXED: 10 column widths
+    # 10 columns width
     col_widths = [
         20,  # ID
         35,  # Company
@@ -80,25 +80,23 @@ def export_pdf(df):
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", "B", 12)
 
-    # Header row
+    # Header
     for i, col in enumerate(df.columns):
         pdf.cell(col_widths[i], 10, col, border=1, fill=True)
     pdf.ln()
 
     pdf.set_font("Arial", size=11)
 
-    # Rows with wrapping (NO max_line_height)
+    # Rows
     for _, row in df.iterrows():
         row_values = [str(v) for v in row]
 
-        # Calculate max height
         heights = []
         for i, value in enumerate(row_values):
             lines = pdf.multi_cell(col_widths[i], 10, value, border=0, split_only=True)
             heights.append(len(lines) * 10)
         max_height = max(heights)
 
-        # Print wrapped cells (FIXED: removed max_line_height)
         for i, value in enumerate(row_values):
             pdf.multi_cell(col_widths[i], 10, value, border=1)
         pdf.ln(max_height)
@@ -106,10 +104,11 @@ def export_pdf(df):
     return pdf.output(dest="S").encode("latin-1", "replace")
 
 
-# ---------------- WORD EXPORT ----------------
+# ---------------- WORD EXPORT (NO add_field — FIXED) ----------------
 def export_word(df):
     doc = Document()
 
+    # Header
     section = doc.sections[0]
     header = section.header
     header_p = header.paragraphs[0]
@@ -117,17 +116,20 @@ def export_word(df):
     header_p.style.font.name = "Calibri"
     header_p.style.font.size = Pt(12)
 
+    # Footer (FIXED — remove add_field)
     footer = section.footer
     footer_p = footer.paragraphs[0]
-    footer_p.text = "Page "
-    footer_p.add_run().add_field('PAGE')
+    footer_p.text = "Page"   # Streamlit Cloud docx version does NOT support add_field()
+
     footer_p.style.font.name = "Calibri"
     footer_p.style.font.size = Pt(11)
 
+    # Title
     title = doc.add_heading("Job Applications", level=1)
     title.style.font.name = "Calibri"
     title.style.font.size = Pt(20)
 
+    # Table
     table = doc.add_table(rows=1, cols=len(df.columns))
     table.autofit = True
     hdr_cells = table.rows[0].cells
