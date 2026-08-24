@@ -1,249 +1,290 @@
 import streamlit as st
 import pandas as pd
 
+# ---------------- AUTH IMPORTS ----------------
+from auth import signup_form, login_form
+
+# ---------------- EXISTING IMPORTS ----------------
 from crud import add_job, get_all_jobs, get_job_by_id, update_job, delete_job
 from filters import apply_search, apply_filters
-from export import export_excel, export_word   # PDF removed
-from dashboard import get_metrics
+from export import export_excel, export_word
+from dashboard import get_metrics, admin_dashboard   # admin dashboard added
 from analytics import chart_status, chart_country, chart_visa, chart_time
+from database import create_tables
 
+# ---------------- INIT DB ----------------
+create_tables()
+
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Job Application Tracker", layout="wide")
 
-st.title("📌 Smart Job Application Tracker")
+# ---------------- ROUTING (NEW) ----------------
+def main():
 
-# ---------------- Load Data ----------------
-rows = get_all_jobs()
+    # If NOT logged in → show signup/login
+    if "user_email" not in st.session_state:
+        st.title("Welcome to Smart Job Application Tracker")
 
-if rows:
-    df = pd.DataFrame(
-        rows,
-        columns=[
-            "ID",
-            "Company",
-            "Job Title",
-            "Country",
-            "Salary",
-            "Currency",
-            "Visa",
-            "Job URL",
-            "Application Date",
-            "Status",
-        ],
-    )
-else:
-    df = pd.DataFrame(
-        columns=[
-            "ID",
-            "Company",
-            "Job Title",
-            "Country",
-            "Salary",
-            "Currency",
-            "Visa",
-            "Job URL",
-            "Application Date",
-            "Status",
-        ]
-    )
+        tab1, tab2 = st.tabs(["Sign Up", "Login"])
 
-# ---------------- Dashboard ----------------
-st.header("📊 Dashboard")
+        with tab1:
+            signup_form()
 
-if not df.empty:
-    metrics = get_metrics(df)
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-    c1.metric("Total", metrics["total"])
-    c2.metric("Saved", metrics["saved"])
-    c3.metric("Applied", metrics["applied"])
-    c4.metric("Assessment", metrics["assessment"])
-    c5.metric("Interview", metrics["interview"])
-    c6.metric("Offer", metrics["offer"])
-    c7.metric("Rejected", metrics["rejected"])
+        with tab2:
+            login_form()
 
-    c8, c9 = st.columns(2)
-    c8.metric("Interview Rate", f"{metrics['interview_rate']:.1f}%")
-    c9.metric("Offer Rate", f"{metrics['offer_rate']:.1f}%")
-else:
-    st.info("No applications yet. Add a job to see dashboard metrics.")
+        return   # STOP here (do not load job tracker)
 
-# ---------------- Add New Job ----------------
-st.sidebar.header("Add New Job")
+    # If logged in → check role
+    role = st.session_state.get("role", "user")
 
-company = st.sidebar.text_input("Company")
-job_title = st.sidebar.text_input("Job Title")
-country = st.sidebar.text_input("Country")
-salary = st.sidebar.text_input("Salary")
-currency = st.sidebar.text_input("Currency")
-visa = st.sidebar.selectbox("Visa Sponsorship", ["Yes", "No", "Unknown"])
-job_url = st.sidebar.text_input("Job URL")
-application_date = st.sidebar.date_input("Application Date")
-status = st.sidebar.selectbox(
-    "Status",
-    ["Saved", "Applied", "Assessment", "Interview", "Offer", "Rejected"],
-)
+    # ---------------- ADMIN DASHBOARD ----------------
+    if role == "admin":
+        admin_dashboard()
+        return
 
-if st.sidebar.button("Save Job"):
-    if not company or not job_title or not country or not status:
-        st.sidebar.error("Company, Job Title, Country and Status are required.")
-    else:
-        add_job(
-            company,
-            job_title,
-            country,
-            salary,
-            currency,
-            visa,
-            job_url,
-            str(application_date),
-            status,
+    # ---------------- USER DASHBOARD (YOUR EXISTING CODE) ----------------
+
+    st.title("📌 Smart Job Application Tracker")
+
+    # ---------------- Load Data ----------------
+    rows = get_all_jobs()
+
+    if rows:
+        df = pd.DataFrame(
+            rows,
+            columns=[
+                "ID",
+                "Company",
+                "Job Title",
+                "Country",
+                "Salary",
+                "Currency",
+                "Visa",
+                "Job URL",
+                "Application Date",
+                "Status",
+            ],
         )
-        st.sidebar.success("Job saved successfully!")
-        st.rerun()
+    else:
+        df = pd.DataFrame(
+            columns=[
+                "ID",
+                "Company",
+                "Job Title",
+                "Country",
+                "Salary",
+                "Currency",
+                "Visa",
+                "Job URL",
+                "Application Date",
+                "Status",
+            ]
+        )
 
-# ---------------- Search & Filters ----------------
-st.header("🔍 Search & Filters")
+    # ---------------- Dashboard ----------------
+    st.header("📊 Dashboard")
 
-search_query = st.text_input("Search by Company, Job Title or Country")
+    if not df.empty:
+        metrics = get_metrics(df)
+        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+        c1.metric("Total", metrics["total"])
+        c2.metric("Saved", metrics["saved"])
+        c3.metric("Applied", metrics["applied"])
+        c4.metric("Assessment", metrics["assessment"])
+        c5.metric("Interview", metrics["interview"])
+        c6.metric("Offer", metrics["offer"])
+        c7.metric("Rejected", metrics["rejected"])
 
-country_options = ["All"] + sorted(df["Country"].dropna().unique().tolist())
-status_options = ["All"] + sorted(df["Status"].dropna().unique().tolist())
-visa_options = ["All"] + sorted(df["Visa"].dropna().unique().tolist())
-currency_options = ["All"] + sorted(df["Currency"].dropna().unique().tolist())
+        c8, c9 = st.columns(2)
+        c8.metric("Interview Rate", f"{metrics['interview_rate']:.1f}%")
+        c9.metric("Offer Rate", f"{metrics['offer_rate']:.1f}%")
+    else:
+        st.info("No applications yet. Add a job to see dashboard metrics.")
 
-fc1, fc2, fc3, fc4 = st.columns(4)
-selected_country = fc1.selectbox("Country", country_options)
-selected_status = fc2.selectbox("Status", status_options)
-selected_visa = fc3.selectbox("Visa", visa_options)
-selected_currency = fc4.selectbox("Currency", currency_options)
+    # ---------------- Add New Job ----------------
+    st.sidebar.header("Add New Job")
 
-filtered_df = df.copy()
-filtered_df = apply_search(filtered_df, search_query)
-filtered_df = apply_filters(
-    filtered_df, selected_country, selected_status, selected_visa, selected_currency
-)
+    company = st.sidebar.text_input("Company")
+    job_title = st.sidebar.text_input("Job Title")
+    country = st.sidebar.text_input("Country")
+    salary = st.sidebar.text_input("Salary")
+    currency = st.sidebar.text_input("Currency")
+    visa = st.sidebar.selectbox("Visa Sponsorship", ["Yes", "No", "Unknown"])
+    job_url = st.sidebar.text_input("Job URL")
+    application_date = st.sidebar.date_input("Application Date")
+    status = st.sidebar.selectbox(
+        "Status",
+        ["Saved", "Applied", "Assessment", "Interview", "Offer", "Rejected"],
+    )
 
-# ---------------- Applications Table ----------------
-st.header("📄 Applications")
+    if st.sidebar.button("Save Job"):
+        if not company or not job_title or not country or not status:
+            st.sidebar.error("Company, Job Title, Country and Status are required.")
+        else:
+            add_job(
+                company,
+                job_title,
+                country,
+                salary,
+                currency,
+                visa,
+                job_url,
+                str(application_date),
+                status,
+            )
+            st.sidebar.success("Job saved successfully!")
+            st.rerun()
 
-if filtered_df.empty:
-    st.info("No applications match the current search/filters.")
-else:
-    st.dataframe(filtered_df, use_container_width=True)
+    # ---------------- Search & Filters ----------------
+    st.header("🔍 Search & Filters")
 
-# ---------------- Edit / Delete ----------------
-st.subheader("✏️ Edit / 🗑 Delete Application")
+    search_query = st.text_input("Search by Company, Job Title or Country")
 
-if not filtered_df.empty:
-    ids = filtered_df["ID"].tolist()
-    selected_id = st.selectbox("Select Application ID", ids)
+    country_options = ["All"] + sorted(df["Country"].dropna().unique().tolist())
+    status_options = ["All"] + sorted(df["Status"].dropna().unique().tolist())
+    visa_options = ["All"] + sorted(df["Visa"].dropna().unique().tolist())
+    currency_options = ["All"] + sorted(df["Currency"].dropna().unique().tolist())
 
-    if selected_id:
-        job = get_job_by_id(selected_id)
-        if job:
-            (
-                _id,
-                c_company,
-                c_job_title,
-                c_country,
-                c_salary,
-                c_currency,
-                c_visa,
-                c_job_url,
-                c_application_date,
-                c_status,
-            ) = job
+    fc1, fc2, fc3, fc4 = st.columns(4)
+    selected_country = fc1.selectbox("Country", country_options)
+    selected_status = fc2.selectbox("Status", status_options)
+    selected_visa = fc3.selectbox("Visa", visa_options)
+    selected_currency = fc4.selectbox("Currency", currency_options)
 
-            with st.form("edit_form"):
-                e_company = st.text_input("Company", c_company)
-                e_job_title = st.text_input("Job Title", c_job_title)
-                e_country = st.text_input("Country", c_country)
-                e_salary = st.text_input("Salary", c_salary)
-                e_currency = st.text_input("Currency", c_currency)
-                e_visa = st.selectbox(
-                    "Visa Sponsorship",
-                    ["Yes", "No", "Unknown"],
-                    index=["Yes", "No", "Unknown"].index(c_visa),
-                )
-                e_job_url = st.text_input("Job URL", c_job_url)
-                e_application_date = st.date_input(
-                    "Application Date", pd.to_datetime(c_application_date)
-                )
-                e_status = st.selectbox(
-                    "Status",
-                    ["Saved", "Applied", "Assessment", "Interview", "Offer", "Rejected"],
-                    index=[
-                        "Saved",
-                        "Applied",
-                        "Assessment",
-                        "Interview",
-                        "Offer",
-                        "Rejected",
-                    ].index(c_status),
-                )
+    filtered_df = df.copy()
+    filtered_df = apply_search(filtered_df, search_query)
+    filtered_df = apply_filters(
+        filtered_df, selected_country, selected_status, selected_visa, selected_currency
+    )
 
-                col_update, col_delete = st.columns(2)
-                update_clicked = col_update.form_submit_button("Update Job")
-                delete_clicked = col_delete.form_submit_button("Delete Job")
+    # ---------------- Applications Table ----------------
+    st.header("📄 Applications")
 
-                if update_clicked:
-                    update_job(
-                        _id,
-                        e_company,
-                        e_job_title,
-                        e_country,
-                        e_salary,
-                        e_currency,
-                        e_visa,
-                        e_job_url,
-                        str(e_application_date),
-                        e_status,
+    if filtered_df.empty:
+        st.info("No applications match the current search/filters.")
+    else:
+        st.dataframe(filtered_df, use_container_width=True)
+
+    # ---------------- Edit / Delete ----------------
+    st.subheader("✏️ Edit / 🗑 Delete Application")
+
+    if not filtered_df.empty:
+        ids = filtered_df["ID"].tolist()
+        selected_id = st.selectbox("Select Application ID", ids)
+
+        if selected_id:
+            job = get_job_by_id(selected_id)
+            if job:
+                (
+                    _id,
+                    c_company,
+                    c_job_title,
+                    c_country,
+                    c_salary,
+                    c_currency,
+                    c_visa,
+                    c_job_url,
+                    c_application_date,
+                    c_status,
+                ) = job
+
+                with st.form("edit_form"):
+                    e_company = st.text_input("Company", c_company)
+                    e_job_title = st.text_input("Job Title", c_job_title)
+                    e_country = st.text_input("Country", c_country)
+                    e_salary = st.text_input("Salary", c_salary)
+                    e_currency = st.text_input("Currency", c_currency)
+                    e_visa = st.selectbox(
+                        "Visa Sponsorship",
+                        ["Yes", "No", "Unknown"],
+                        index=["Yes", "No", "Unknown"].index(c_visa),
                     )
-                    st.success("Job updated successfully!")
-                    st.rerun()
+                    e_job_url = st.text_input("Job URL", c_job_url)
+                    e_application_date = st.date_input(
+                        "Application Date", pd.to_datetime(c_application_date)
+                    )
+                    e_status = st.selectbox(
+                        "Status",
+                        ["Saved", "Applied", "Assessment", "Interview", "Offer", "Rejected"],
+                        index=[
+                            "Saved",
+                            "Applied",
+                            "Assessment",
+                            "Interview",
+                            "Offer",
+                            "Rejected",
+                        ].index(c_status),
+                    )
 
-                if delete_clicked:
-                    confirm = st.checkbox("Confirm delete", value=False)
-                    if confirm:
-                        delete_job(_id)
-                        st.success("Job deleted successfully!")
+                    col_update, col_delete = st.columns(2)
+                    update_clicked = col_update.form_submit_button("Update Job")
+                    delete_clicked = col_delete.form_submit_button("Delete Job")
+
+                    if update_clicked:
+                        update_job(
+                            _id,
+                            e_company,
+                            e_job_title,
+                            e_country,
+                            e_salary,
+                            e_currency,
+                            e_visa,
+                            e_job_url,
+                            str(e_application_date),
+                            e_status,
+                        )
+                        st.success("Job updated successfully!")
                         st.rerun()
 
-# ---------------- Export ----------------
-st.header("📤 Export Applications")
+                    if delete_clicked:
+                        confirm = st.checkbox("Confirm delete", value=False)
+                        if confirm:
+                            delete_job(_id)
+                            st.success("Job deleted successfully!")
+                            st.rerun()
 
-if filtered_df.empty:
-    st.info("No data to export.")
-else:
-    filtered_df = filtered_df[
-        [
-            "ID",
-            "Company",
-            "Job Title",
-            "Country",
-            "Salary",
-            "Currency",
-            "Visa",
-            "Job URL",
-            "Application Date",
-            "Status",
+    # ---------------- Export ----------------
+    st.header("📤 Export Applications")
+
+    if filtered_df.empty:
+        st.info("No data to export.")
+    else:
+        filtered_df = filtered_df[
+            [
+                "ID",
+                "Company",
+                "Job Title",
+                "Country",
+                "Salary",
+                "Currency",
+                "Visa",
+                "Job URL",
+                "Application Date",
+                "Status",
+            ]
         ]
-    ]
 
-    word_data = export_word(filtered_df)
-    excel_bytes = export_excel(filtered_df)
+        word_data = export_word(filtered_df)
+        excel_bytes = export_excel(filtered_df)
 
-    ec1, ec2 = st.columns(2)
+        ec1, ec2 = st.columns(2)
 
-    ec1.download_button(
-        "Download Excel",
-        data=excel_bytes,
-        file_name="applications.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+        ec1.download_button(
+            "Download Excel",
+            data=excel_bytes,
+            file_name="applications.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
-    ec2.download_button(
-        "Download Word",
-        data=word_data,
-        file_name="applications.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
+        ec2.download_button(
+            "Download Word",
+            data=word_data,
+            file_name="applications.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+
+# ---------------- RUN APP ----------------
+if __name__ == "__main__":
+    main()
