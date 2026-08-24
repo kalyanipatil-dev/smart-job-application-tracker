@@ -6,11 +6,12 @@ import random
 from database import get_connection
 from crud import add_log
 
-# ---------------- HELPERS ----------------
+# ---------------- EMAIL VALIDATION ----------------
 def validate_email(email: str) -> bool:
     pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     return re.match(pattern, email) is not None
 
+# ---------------- PASSWORD VALIDATION ----------------
 def validate_password(password: str) -> (bool, str):
     if len(password) < 8 or len(password) > 16:
         return False, "Password must be 8–16 characters long."
@@ -24,6 +25,15 @@ def validate_password(password: str) -> (bool, str):
         return False, "Password must contain at least one special character."
     return True, ""
 
+# ---------------- MOBILE VALIDATION ----------------
+def validate_mobile(mobile: str) -> (bool, str):
+    if not mobile.isdigit():
+        return False, "Mobile number must contain only digits."
+    if len(mobile) != 10:
+        return False, "Mobile number must be exactly 10 digits."
+    return True, ""
+
+# ---------------- DB HELPERS ----------------
 def get_user(email, password):
     conn = get_connection()
     c = conn.cursor()
@@ -59,20 +69,14 @@ def set_admin_password(user_id, new_password):
 def set_otp(user_id, otp_code):
     conn = get_connection()
     c = conn.cursor()
-    c.execute(
-        "UPDATE users SET otp_code=? WHERE id=?",
-        (otp_code, user_id),
-    )
+    c.execute("UPDATE users SET otp_code=? WHERE id=?", (otp_code, user_id))
     conn.commit()
     conn.close()
 
 def clear_otp(user_id):
     conn = get_connection()
     c = conn.cursor()
-    c.execute(
-        "UPDATE users SET otp_code=NULL WHERE id=?",
-        (user_id,),
-    )
+    c.execute("UPDATE users SET otp_code=NULL WHERE id=?", (user_id,))
     conn.commit()
     conn.close()
 
@@ -80,29 +84,31 @@ def clear_otp(user_id):
 def signup_form():
     st.subheader("Sign Up")
 
-    name = st.text_input("Full Name")
-    username = st.text_input("Username")
-    email = st.text_input("Email")
-    mobile = st.text_input("Mobile Number")
-    password = st.text_input("Password", type="password")
+    name = st.text_input("Full Name", key="signup_name")
+    username = st.text_input("Username", key="signup_username")
+    email = st.text_input("Email", key="signup_email")
+    mobile = st.text_input("Mobile Number", key="signup_mobile")
+    password = st.text_input("Password", type="password", key="signup_password")
+
     st.caption("Password must be 8–16 chars, include uppercase, lowercase, digit, special character.")
 
-    if st.button("Create Account"):
+    if st.button("Create Account", key="signup_btn"):
         if not name or not username or not email or not mobile or not password:
             st.error("All fields are required.")
             return
 
-        if not mobile.isdigit():
-            st.error("Mobile number must contain only digits.")
+        valid_mobile, msg_mobile = validate_mobile(mobile)
+        if not valid_mobile:
+            st.error(msg_mobile)
             return
 
         if not validate_email(email):
             st.error("Invalid email format.")
             return
 
-        valid, msg = validate_password(password)
-        if not valid:
-            st.error(msg)
+        valid_pass, msg_pass = validate_password(password)
+        if not valid_pass:
+            st.error(msg_pass)
             return
 
         conn = get_connection()
@@ -127,10 +133,10 @@ def signup_form():
 def login_form():
     st.subheader("User Login")
 
-    email = st.text_input("Email")
-    password = st.text_input("Password", type="password")
+    email = st.text_input("Email", key="user_login_email")
+    password = st.text_input("Password", type="password", key="user_login_pass")
 
-    if st.button("Login"):
+    if st.button("Login", key="user_login_btn"):
         if not validate_email(email):
             st.error("Invalid email format.")
             return
@@ -149,18 +155,19 @@ def login_form():
             st.session_state["user_name"] = name
             st.session_state["user_email"] = email
             st.session_state["role"] = role
+
             add_log(email, "login", "User logged in")
             st.success("Logged in successfully!")
             st.rerun()
 
-# ---------------- ADMIN FIRST LOGIN (USERNAME + EMAIL + OTP) ----------------
+# ---------------- ADMIN FIRST LOGIN (OTP FLOW) ----------------
 def admin_first_login():
     st.sidebar.subheader("Admin First Login")
 
-    username = st.sidebar.text_input("Admin Username")
-    email = st.sidebar.text_input("Admin Email")
+    username = st.sidebar.text_input("Admin Username", key="admin_first_username")
+    email = st.sidebar.text_input("Admin Email", key="admin_first_email")
 
-    if st.sidebar.button("Send Verification Code"):
+    if st.sidebar.button("Send Verification Code", key="admin_send_otp"):
         user = get_user_by_username(username)
         if not user:
             st.sidebar.error("Admin user not found.")
@@ -187,16 +194,16 @@ def admin_first_login():
         otp = str(random.randint(100000, 999999))
         set_otp(_id, otp)
 
-        # NOTE: सध्या testing साठी OTP स्क्रीनवर दाखवते.
         st.sidebar.success(f"Verification code sent. (Testing OTP: {otp})")
 
         st.session_state["admin_otp_user_id"] = _id
 
     if "admin_otp_user_id" in st.session_state:
-        otp_input = st.sidebar.text_input("Enter Verification Code")
+        otp_input = st.sidebar.text_input("Enter Verification Code", key="admin_otp_input")
 
-        if st.sidebar.button("Verify Code"):
+        if st.sidebar.button("Verify Code", key="admin_verify_otp"):
             user_id = st.session_state["admin_otp_user_id"]
+
             conn = get_connection()
             c = conn.cursor()
             c.execute("SELECT otp_code FROM users WHERE id=?", (user_id,))
@@ -214,27 +221,27 @@ def admin_first_login():
             clear_otp(user_id)
             st.sidebar.success("Verification successful. Set your admin password below.")
 
-            new_password = st.sidebar.text_input("New Admin Password", type="password")
-            st.sidebar.caption("Password must be 8–16 chars, include uppercase, lowercase, digit, special character.")
+            new_password = st.sidebar.text_input("New Admin Password", type="password", key="admin_new_pass")
 
-            if st.sidebar.button("Set Admin Password"):
-                valid, msg = validate_password(new_password)
-                if not valid:
-                    st.sidebar.error(msg)
+            if st.sidebar.button("Set Admin Password", key="admin_set_pass"):
+                valid_pass, msg_pass = validate_password(new_password)
+                if not valid_pass:
+                    st.sidebar.error(msg_pass)
                     return
 
                 set_admin_password(user_id, new_password)
                 st.sidebar.success("Admin password set successfully. Now login with username + password.")
+
                 del st.session_state["admin_otp_user_id"]
 
-# ---------------- ADMIN NORMAL LOGIN (USERNAME + PASSWORD) ----------------
+# ---------------- ADMIN NORMAL LOGIN ----------------
 def admin_normal_login():
     st.sidebar.subheader("Admin Login")
 
-    username = st.sidebar.text_input("Admin Username")
-    password = st.sidebar.text_input("Admin Password", type="password")
+    username = st.sidebar.text_input("Admin Username", key="admin_normal_username")
+    password = st.sidebar.text_input("Admin Password", type="password", key="admin_normal_pass")
 
-    if st.sidebar.button("Login as Admin"):
+    if st.sidebar.button("Login as Admin", key="admin_normal_login_btn"):
         user = get_user_by_username(username)
         if not user:
             st.sidebar.error("Admin user not found.")
@@ -264,5 +271,6 @@ def admin_normal_login():
         st.session_state["user_name"] = name
         st.session_state["user_email"] = u_email
         st.session_state["role"] = role
+
         st.success("Admin logged in successfully!")
         st.rerun()
