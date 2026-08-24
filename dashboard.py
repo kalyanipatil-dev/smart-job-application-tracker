@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from database import get_connection
 
+# ---------------- METRICS ----------------
 def get_metrics(df):
     if df.empty:
         return {
@@ -39,6 +40,7 @@ def get_metrics(df):
         "offer_rate": offer_rate,
     }
 
+# ---------------- ADMIN DASHBOARD ----------------
 def get_all_users():
     conn = get_connection()
     c = conn.cursor()
@@ -65,8 +67,18 @@ def get_logs():
 def admin_dashboard():
     st.title("👑 Admin Dashboard")
 
+    # Back to Home button
+    back_col, _, _, _ = st.columns([1, 3, 1, 1])
+    with back_col:
+        if st.button("← Back to Home", key="admin_back_home"):
+            for key in ["user_id", "user_email", "user_name", "role", "show_admin_login"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+
     tab1, tab2 = st.tabs(["Users", "Activity Logs"])
 
+    # USERS TAB
     with tab1:
         st.subheader("Registered Users")
 
@@ -95,6 +107,7 @@ def admin_dashboard():
                 st.success("User status updated successfully!")
                 st.rerun()
 
+    # LOGS TAB
     with tab2:
         st.subheader("Activity Logs")
 
