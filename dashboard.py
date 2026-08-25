@@ -1,125 +1,91 @@
-import streamlit as st
 import pandas as pd
-from database import get_connection
+import streamlit as st
 
-# ---------------- METRICS ----------------
+from crud import get_all_users, update_user_status, get_logs
+
+
 def get_metrics(df):
-    if df.empty:
+    total = len(df)
+    if total == 0:
         return {
-            "total": 0,
-            "saved": 0,
-            "applied": 0,
-            "assessment": 0,
-            "interview": 0,
-            "offer": 0,
-            "rejected": 0,
-            "interview_rate": 0,
-            "offer_rate": 0,
+            "total": 0, "saved": 0, "applied": 0, "assessment": 0,
+            "interview": 0, "offer": 0, "rejected": 0,
+            "interview_rate": 0.0, "offer_rate": 0.0,
         }
 
-    total = len(df)
-    saved = (df["Status"] == "Saved").sum()
-    applied = (df["Status"] == "Applied").sum()
-    assessment = (df["Status"] == "Assessment").sum()
-    interview = (df["Status"] == "Interview").sum()
-    offer = (df["Status"] == "Offer").sum()
-    rejected = (df["Status"] == "Rejected").sum()
+    def count(status):
+        return int((df["Status"] == status).sum())
 
-    interview_rate = (interview / total) * 100 if total else 0
-    offer_rate = (offer / total) * 100 if total else 0
+    interview = count("Interview")
+    offer = count("Offer")
 
     return {
         "total": total,
-        "saved": saved,
-        "applied": applied,
-        "assessment": assessment,
+        "saved": count("Saved"),
+        "applied": count("Applied"),
+        "assessment": count("Assessment"),
         "interview": interview,
         "offer": offer,
-        "rejected": rejected,
-        "interview_rate": interview_rate,
-        "offer_rate": offer_rate,
+        "rejected": count("Rejected"),
+        "interview_rate": (interview / total) * 100,
+        "offer_rate": (offer / total) * 100,
     }
 
-# ---------------- ADMIN HELPERS ----------------
-def get_all_users():
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT id, name, username, email, role, status FROM users")
-    rows = c.fetchall()
-    conn.close()
-    return rows
 
-def update_user_status(user_id, new_status):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET status=? WHERE id=?", (new_status, user_id))
-    conn.commit()
-    conn.close()
-
-def get_logs():
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT user_email, action, details, timestamp FROM logs ORDER BY id DESC")
-    rows = c.fetchall()
-    conn.close()
-    return rows
-
-# ---------------- ADMIN DASHBOARD ----------------
 def admin_dashboard():
     st.title("👑 Admin Dashboard")
+    st.caption("User management and audit activity")
 
-    # ---------------- BACK TO HOME BUTTON ----------------
-    back_col, _, _, _ = st.columns([1, 3, 1, 1])
-    with back_col:
-        if st.button("← Back to Home", key="admin_back_home"):
-            # फक्त admin navigation flag clear करायचा
-            if "show_admin_login" in st.session_state:
-                del st.session_state["show_admin_login"]
+    if st.button("← Back to Home", key="admin_dashboard_back"):
+        st.session_state["show_admin_login"] = False
+        # Keep admin session available; this is navigation, not logout.
+        st.rerun()
 
-            # Admin logout नको असेल तर खालील uncomment करू नकोस
-            # for key in ["user_id", "user_email", "user_name", "role"]:
-            #     if key in st.session_state:
-            #         del st.session_state[key]
+    tab_users, tab_logs = st.tabs(["👥 Users", "📝 Activity Logs"])
 
-            st.rerun()
-
-    # ---------------- TABS ----------------
-    tab1, tab2 = st.tabs(["Users", "Activity Logs"])
-
-    # ---------------- USERS TAB ----------------
-    with tab1:
-        st.subheader("Registered Users")
-
+    with tab_users:
         users = get_all_users()
-        df_users = pd.DataFrame(users, columns=["ID", "Name", "Username", "Email", "Role", "Status"])
+        df_users = pd.DataFrame(users)
 
-        st.dataframe(df_users, use_container_width=True)
+        if df_users.empty:
+            st.info("No users found.")
+        else:
+            display_df = df_users.rename(columns={
+                "id": "ID",
+                "name": "Name",
+                "username": "Username",
+                "email": "Email",
+                "role": "Role",
+                "status": "Status",
+                "created_at": "Created At",
+            })
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-        st.subheader("Update User Status")
-
-        if not df_users.empty:
-            user_ids = df_users["ID"].tolist()
-            selected_id = st.selectbox("Select User ID", user_ids)
-
-            selected_user = df_users[df_users["ID"] == selected_id].iloc[0]
-            current_status = selected_user["Status"]
+            st.subheader("Update User Status")
+            selected_id = st.selectbox(
+                "Select User ID",
+                display_df["ID"].tolist(),
+                key="admin_selected_user",
+            )
+            selected = display_df[display_df["ID"] == selected_id].iloc[0]
+            current = selected["Status"]
 
             new_status = st.selectbox(
                 "New Status",
                 ["active", "inactive"],
-                index=["active", "inactive"].index(current_status)
+                index=0 if current == "active" else 1,
             )
 
-            if st.button("Update Status"):
-                update_user_status(selected_id, new_status)
-                st.success("User status updated successfully!")
+            if st.button("Update Status", key="admin_update_status"):
+                admin_email = st.session_state.get("user_email", "admin")
+                update_user_status(selected_id, new_status, admin_email)
+                st.success("User status updated successfully.")
                 st.rerun()
 
-    # ---------------- LOGS TAB ----------------
-    with tab2:
-        st.subheader("Activity Logs")
-
+    with tab_logs:
         logs = get_logs()
-        df_logs = pd.DataFrame(logs, columns=["User Email", "Action", "Details", "Timestamp"])
-
-        st.dataframe(df_logs, use_container_width=True)
+        df_logs = pd.DataFrame(logs)
+        if df_logs.empty:
+            st.info("No activity logs found.")
+        else:
+            st.dataframe(df_logs, use_container_width=True, hide_index=True)
