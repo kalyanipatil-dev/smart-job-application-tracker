@@ -36,7 +36,7 @@ def validate_password(password):
 
     if not re.search(
         r"""[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/'`~;]""",
-        password,
+        password
     ):
         return False, "Password must contain at least one special character."
 
@@ -62,12 +62,12 @@ def hash_password(password):
         "sha256",
         password.encode(),
         salt,
-        120_000,
+        120000
     )
 
     return "pbkdf2_sha256$120000$%s$%s" % (
         salt.hex(),
-        digest.hex(),
+        digest.hex()
     )
 
 
@@ -83,20 +83,21 @@ def verify_password(password, stored):
                 "sha256",
                 password.encode(),
                 bytes.fromhex(salt_hex),
-                int(iterations),
+                int(iterations)
             )
 
             return hmac.compare_digest(
                 digest.hex(),
-                digest_hex,
+                digest_hex
             ), False
 
         except (ValueError, TypeError):
             return False, False
 
-    # Backward compatibility for older local databases
-    # that stored plaintext passwords.
-    return hmac.compare_digest(password, stored), True
+    return hmac.compare_digest(
+        password,
+        stored
+    ), True
 
 
 def get_user_by_email(email):
@@ -116,7 +117,7 @@ def get_user_by_email(email):
         FROM users
         WHERE LOWER(email) = LOWER(?)
         """,
-        (email.strip(),),
+        (email.strip(),)
     ).fetchone()
 
     conn.close()
@@ -143,7 +144,7 @@ def get_user_by_username(username):
         FROM users
         WHERE LOWER(username) = LOWER(?)
         """,
-        (username.strip(),),
+        (username.strip(),)
     ).fetchone()
 
     conn.close()
@@ -162,8 +163,8 @@ def _upgrade_plaintext_password(user_id, password):
         """,
         (
             hash_password(password),
-            user_id,
-        ),
+            user_id
+        )
     )
 
     conn.commit()
@@ -175,28 +176,28 @@ def signup_form():
 
     name = st.text_input(
         "Full Name",
-        key="signup_name",
+        key="signup_name"
     )
 
     username = st.text_input(
         "Username",
-        key="signup_username",
+        key="signup_username"
     )
 
     email = st.text_input(
         "Email",
-        key="signup_email",
+        key="signup_email"
     )
 
     mobile = st.text_input(
         "Mobile Number",
-        key="signup_mobile",
+        key="signup_mobile"
     )
 
     password = st.text_input(
         "Password",
         type="password",
-        key="signup_password",
+        key="signup_password"
     )
 
     st.caption(
@@ -212,7 +213,7 @@ def signup_form():
     if st.button(
         "Create Account",
         key="signup_btn",
-        type="primary",
+        type="primary"
     ):
         name = name.strip()
         username = username.strip()
@@ -220,13 +221,7 @@ def signup_form():
         mobile = mobile.strip()
 
         if not all(
-            [
-                name,
-                username,
-                email,
-                mobile,
-                password,
-            ]
+            [name, username, email, mobile, password]
         ):
             st.error("All fields are required.")
             return
@@ -286,8 +281,8 @@ def signup_form():
                     username,
                     email,
                     mobile,
-                    hash_password(password),
-                ),
+                    hash_password(password)
+                )
             )
 
             conn.commit()
@@ -295,16 +290,13 @@ def signup_form():
         except Exception as exc:
             conn.rollback()
 
-            message = str(exc).lower()
-
-            if "unique" in message:
+            if "unique" in str(exc).lower():
                 st.error(
                     "Email or username already exists."
                 )
             else:
                 st.error(
-                    "Unable to create the account. "
-                    "Please try again."
+                    "Unable to create the account. Please try again."
                 )
 
             return
@@ -315,7 +307,7 @@ def signup_form():
         add_log(
             email,
             "SIGNUP",
-            "User created an account.",
+            "User created an account."
         )
 
         st.success(
@@ -328,24 +320,26 @@ def login_form():
 
     email = st.text_input(
         "Email",
-        key="user_login_email",
+        key="user_login_email"
     )
 
     password = st.text_input(
         "Password",
         type="password",
-        key="user_login_pass",
+        key="user_login_pass"
     )
 
     if st.button(
         "Login",
         key="user_login_btn",
-        type="primary",
+        type="primary"
     ):
         email = email.strip().lower()
 
         if not validate_email(email):
-            st.error("Invalid email address.")
+            st.error(
+                "Invalid email address. Please enter a valid email."
+            )
             return
 
         user = get_user_by_email(email)
@@ -360,7 +354,7 @@ def login_form():
 
         valid, was_plaintext = verify_password(
             password,
-            user["password"],
+            user["password"]
         )
 
         if not valid:
@@ -370,7 +364,7 @@ def login_form():
         if was_plaintext:
             _upgrade_plaintext_password(
                 user["id"],
-                password,
+                password
             )
 
         st.session_state["user_id"] = user["id"]
@@ -381,10 +375,12 @@ def login_form():
         add_log(
             user["email"],
             "LOGIN",
-            "User logged in.",
+            "User logged in."
         )
 
-        st.success("Logged in successfully!")
+        st.success(
+            "Logged in successfully!"
+        )
 
         st.rerun()
 
@@ -392,25 +388,22 @@ def login_form():
 def admin_normal_login(admin):
     st.subheader("🔐 Admin Login")
 
-    st.caption(
-        "Administrator access"
-    )
-
     username = st.text_input(
         "Admin Username",
-        key="admin_normal_username",
+        value=admin["username"],
+        key="admin_normal_username"
     )
 
     password = st.text_input(
         "Admin Password",
         type="password",
-        key="admin_normal_pass",
+        key="admin_normal_pass"
     )
 
     if st.button(
         "Login as Admin",
         key="admin_normal_login_btn",
-        type="primary",
+        type="primary"
     ):
         if username.strip().lower() != admin["username"].lower():
             st.error("Invalid admin credentials.")
@@ -422,7 +415,7 @@ def admin_normal_login(admin):
 
         valid, was_plaintext = verify_password(
             password,
-            admin["password"],
+            admin["password"]
         )
 
         if not valid:
@@ -432,7 +425,7 @@ def admin_normal_login(admin):
         if was_plaintext:
             _upgrade_plaintext_password(
                 admin["id"],
-                password,
+                password
             )
 
         st.session_state["user_id"] = admin["id"]
@@ -442,13 +435,13 @@ def admin_normal_login(admin):
 
         st.session_state.pop(
             "show_admin_login",
-            None,
+            None
         )
 
         add_log(
             admin["email"],
             "ADMIN_LOGIN",
-            "Admin logged in.",
+            "Admin logged in."
         )
 
         st.success(
@@ -467,7 +460,7 @@ def logout_user():
         add_log(
             email,
             "LOGOUT",
-            "User logged out.",
+            "User logged out."
         )
 
     for key in [
@@ -478,9 +471,9 @@ def logout_user():
         "show_admin_login",
         "admin_otp_user_id",
         "admin_verified",
-        "confirm_delete_id",
+        "confirm_delete_id"
     ]:
         st.session_state.pop(
             key,
-            None,
+            None
         )
