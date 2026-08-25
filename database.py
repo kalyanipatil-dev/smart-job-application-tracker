@@ -1,58 +1,94 @@
 import sqlite3
+from pathlib import Path
 
 DB_NAME = "jobs.db"
 
+
 def get_connection():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
     return conn
+
+
+def _add_column_if_missing(cursor, table, column, definition):
+    columns = {row[1] for row in cursor.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
 
 def init_db():
     conn = get_connection()
     c = conn.cursor()
 
-    # ---------------- USERS TABLE ----------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            username TEXT UNIQUE,
-            email TEXT UNIQUE,
-            mobile TEXT,
-            password TEXT,
+            name TEXT NOT NULL,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            mobile TEXT NOT NULL,
+            password TEXT NOT NULL,
             role TEXT DEFAULT 'user',
             status TEXT DEFAULT 'active',
             first_login INTEGER DEFAULT 1,
-            otp_code TEXT
+            otp_code TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # ---------------- JOBS TABLE ----------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company TEXT,
-            job_title TEXT,
-            country TEXT,
+            company TEXT NOT NULL,
+            job_title TEXT NOT NULL,
+            country TEXT NOT NULL,
             salary TEXT,
             currency TEXT,
             visa TEXT,
             job_url TEXT,
             application_date TEXT,
-            status TEXT,
-            user_email TEXT
+            status TEXT NOT NULL,
+            user_email TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # ---------------- LOGS TABLE ----------------
     c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_email TEXT,
-            action TEXT,
+            action TEXT NOT NULL,
             details TEXT,
-            timestamp TEXT
+            timestamp TEXT NOT NULL
         )
     """)
 
+    # Safe compatibility migration for older versions.
+    _add_column_if_missing(c, "users", "first_login", "INTEGER DEFAULT 1")
+    _add_column_if_missing(c, "users", "otp_code", "TEXT")
+    _add_column_if_missing(c, "users", "created_at", "TEXT")
+    _add_column_if_missing(c, "jobs", "created_at", "TEXT")
+    _add_column_if_missing(c, "jobs", "updated_at", "TEXT")
+
+    c.execute("CREATE INDEX IF NOT EXISTS idx_jobs_user_email ON jobs(user_email)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_logs_user_email ON logs(user_email)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
+
     conn.commit()
     conn.close()
+
+
+def get_admin_account():
+    conn = get_connection()
+    row = conn.execute("""
+        SELECT id, name, username, email, mobile, password, role, status,
+               first_login, otp_code
+        FROM users
+        WHERE role = 'admin'
+        ORDER BY id
+        LIMIT 1
+    """).fetchone()
+    conn.close()
+    return row
