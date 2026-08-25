@@ -747,7 +747,7 @@ if st.button(
       key="admin_dashboard_back_home"
    ):
       back_to_home()
-return
+   return
 render_user_dashboard()
 
 
