@@ -751,7 +751,7 @@ if st.session_state.get("role") == "admin":
 
    return
 
-    render_user_dashboard()
+   render_user_dashboard()
 
 
 if __name__ == "__main__":
