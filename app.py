@@ -710,9 +710,7 @@ def render_user_dashboard():
 def main():
     render_header()
 
-    if st.session_state.get(
-        "show_admin_login"
-    ):
+    if st.session_state.get("show_admin_login"):
         render_admin_login()
         return
 
@@ -740,7 +738,7 @@ def main():
 
         return
 
-if st.session_state.get("role") == "admin":
+    if st.session_state.get("role") == "admin":
         admin_dashboard()
 
         if st.button(
@@ -751,7 +749,7 @@ if st.session_state.get("role") == "admin":
 
         return
 
-       render_user_dashboard()
+    render_user_dashboard()
 
 
 if __name__ == "__main__":
