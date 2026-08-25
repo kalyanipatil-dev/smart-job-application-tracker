@@ -4,9 +4,6 @@ import os
 
 DB_NAME = "jobs.db"
 
-# =========================================================
-# PREDEFINED ADMIN ACCOUNT
-# =========================================================
 ADMIN_USERNAME = "Kat"
 ADMIN_NAME = "Kalyani Patil"
 ADMIN_EMAIL = "admin@jobtracker.local"
@@ -14,25 +11,25 @@ ADMIN_MOBILE = "0000000000"
 ADMIN_PASSWORD = "Kat@2026"
 
 
-def _hash_admin_password(password):
+def get_connection():
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def hash_admin_password(password):
     salt = os.urandom(16)
     digest = hashlib.pbkdf2_hmac(
         "sha256",
         password.encode(),
         salt,
-        120_000
+        120000
     )
 
     return "pbkdf2_sha256$120000$%s$%s" % (
         salt.hex(),
         digest.hex()
     )
-
-
-def get_connection():
-    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def _add_column_if_missing(cursor, table, column, definition):
@@ -50,12 +47,6 @@ def _add_column_if_missing(cursor, table, column, definition):
 
 
 def _ensure_admin_account(conn):
-    """
-    Ensures that the predefined Admin account exists.
-
-    Admin signup is NOT available through the normal signup form.
-    """
-
     admin = conn.execute(
         """
         SELECT id
@@ -66,11 +57,9 @@ def _ensure_admin_account(conn):
         """
     ).fetchone()
 
-    password_hash = _hash_admin_password(ADMIN_PASSWORD)
+    password_hash = hash_admin_password(ADMIN_PASSWORD)
 
     if admin:
-        # Keep the existing admin account but reset it to the
-        # predefined Admin credentials.
         conn.execute(
             """
             UPDATE users
@@ -91,70 +80,68 @@ def _ensure_admin_account(conn):
                 ADMIN_EMAIL,
                 ADMIN_MOBILE,
                 password_hash,
-                admin["id"],
-            ),
+                admin["id"]
+            )
         )
+        return
 
-    else:
-        # If the predefined username already exists as a normal user,
-        # convert that account into the Admin account.
-        existing_username = conn.execute(
+    existing = conn.execute(
+        """
+        SELECT id
+        FROM users
+        WHERE LOWER(username)=LOWER(?)
+        LIMIT 1
+        """,
+        (ADMIN_USERNAME,)
+    ).fetchone()
+
+    if existing:
+        conn.execute(
             """
-            SELECT id
-            FROM users
-            WHERE LOWER(username)=LOWER(?)
-            LIMIT 1
+            UPDATE users
+            SET name=?,
+                email=?,
+                mobile=?,
+                password=?,
+                role='admin',
+                status='active',
+                first_login=0,
+                otp_code=NULL
+            WHERE id=?
             """,
-            (ADMIN_USERNAME,),
-        ).fetchone()
-
-        if existing_username:
-            conn.execute(
-                """
-                UPDATE users
-                SET name=?,
-                    email=?,
-                    mobile=?,
-                    password=?,
-                    role='admin',
-                    status='active',
-                    first_login=0,
-                    otp_code=NULL
-                WHERE id=?
-                """,
-                (
-                    ADMIN_NAME,
-                    ADMIN_EMAIL,
-                    ADMIN_MOBILE,
-                    password_hash,
-                    existing_username["id"],
-                ),
+            (
+                ADMIN_NAME,
+                ADMIN_EMAIL,
+                ADMIN_MOBILE,
+                password_hash,
+                existing["id"]
             )
-        else:
-            conn.execute(
-                """
-                INSERT INTO users
-                (
-                    name,
-                    username,
-                    email,
-                    mobile,
-                    password,
-                    role,
-                    status,
-                    first_login,
-                    otp_code
-                )
-                VALUES (?, ?, ?, ?, ?, 'admin', 'active', 0, NULL)
-                """,
-                (
-                    ADMIN_NAME,
-                    ADMIN_USERNAME,
-                    ADMIN_EMAIL,
-                    ADMIN_MOBILE,
-                    password_hash,
-                ),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO users
+            (
+                name,
+                username,
+                email,
+                mobile,
+                password,
+                role,
+                status,
+                first_login,
+                otp_code
             )
+            VALUES (?, ?, ?, ?, ?, 'admin', 'active', 0, NULL)
+            """,
+            (
+                ADMIN_NAME,
+                ADMIN_USERNAME,
+                ADMIN_EMAIL,
+                ADMIN_MOBILE,
+                password_hash
+            )
+        )
 
 
 def init_db():
@@ -211,7 +198,6 @@ def init_db():
         """
     )
 
-    # Compatibility migration for older database versions.
     _add_column_if_missing(
         c, "users", "first_login", "INTEGER DEFAULT 1"
     )
@@ -233,34 +219,25 @@ def init_db():
     )
 
     c.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_jobs_user_email
-        ON jobs(user_email)
-        """
+        "CREATE INDEX IF NOT EXISTS idx_jobs_user_email "
+        "ON jobs(user_email)"
     )
 
     c.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_logs_user_email
-        ON logs(user_email)
-        """
+        "CREATE INDEX IF NOT EXISTS idx_logs_user_email "
+        "ON logs(user_email)"
     )
 
     c.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_users_email
-        ON users(email)
-        """
+        "CREATE INDEX IF NOT EXISTS idx_users_email "
+        "ON users(email)"
     )
 
     c.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_users_role
-        ON users(role)
-        """
+        "CREATE INDEX IF NOT EXISTS idx_users_role "
+        "ON users(role)"
     )
 
-    # Automatically create/ensure the predefined Admin.
     _ensure_admin_account(conn)
 
     conn.commit()
