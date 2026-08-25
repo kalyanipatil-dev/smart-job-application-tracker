@@ -1,35 +1,28 @@
-import streamlit as st
-import datetime
-import re
+import hashlib
+import hmac
+import os
 import random
+import re
+
+import streamlit as st
 
 from database import get_connection
 from crud import add_log
 
-# ---------------- EMAIL VALIDATION ----------------
-def validate_email(email: str) -> bool:
+
+EMAIL_RE = re.compile(
+    r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$"
+)
+
+
+def validate_email(email):
     email = email.strip()
-    if email.count("@") != 1:
-        return False
+    return bool(EMAIL_RE.fullmatch(email))
 
-    local, domain = email.split("@")
 
-    if not local or not domain:
-        return False
-
-    if "." not in domain:
-        return False
-
-    if domain.startswith(".") or domain.endswith("."):
-        return False
-
-    if ".." in domain:
-        return False
-
-    return True
-
-# ---------------- PASSWORD VALIDATION ----------------
-def validate_password(password: str) -> (bool, str):
+def validate_password(password):
     if len(password) < 8 or len(password) > 16:
         return False, "Password must be 8–16 characters long."
     if not re.search(r"[A-Z]", password):
@@ -38,66 +31,85 @@ def validate_password(password: str) -> (bool, str):
         return False, "Password must contain at least one lowercase letter."
     if not re.search(r"[0-9]", password):
         return False, "Password must contain at least one digit."
-    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+    if not re.search(r"""[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/'`~;]""", password):
         return False, "Password must contain at least one special character."
     return True, ""
 
-# ---------------- MOBILE VALIDATION ----------------
-def validate_mobile(mobile: str) -> (bool, str):
+
+def validate_mobile(mobile):
+    mobile = mobile.strip()
+    if not mobile:
+        return False, "Mobile number is required."
     if not mobile.isdigit():
-        return False, "Invalid mobile number. Please enter numbers only."
+        return False, "Invalid mobile number. Please use numbers only (0–9)."
     return True, ""
 
-# ---------------- DB HELPERS ----------------
-def get_user(email, password):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute(
-        "SELECT id, name, email, role, status FROM users WHERE email=? AND password=?",
-        (email, password),
+
+def hash_password(password):
+    salt = os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 120_000)
+    return "pbkdf2_sha256$120000$%s$%s" % (
+        salt.hex(),
+        digest.hex(),
     )
-    row = c.fetchone()
+
+
+def verify_password(password, stored):
+    if not stored:
+        return False, False
+
+    if stored.startswith("pbkdf2_sha256$"):
+        try:
+            _, iterations, salt_hex, digest_hex = stored.split("$", 3)
+            digest = hashlib.pbkdf2_hmac(
+                "sha256",
+                password.encode(),
+                bytes.fromhex(salt_hex),
+                int(iterations),
+            )
+            return hmac.compare_digest(digest.hex(), digest_hex), False
+        except (ValueError, TypeError):
+            return False, False
+
+    # Backward compatibility for older local databases that stored plaintext.
+    return hmac.compare_digest(password, stored), True
+
+
+def get_user_by_email(email):
+    conn = get_connection()
+    row = conn.execute("""
+        SELECT id, name, username, email, mobile, password, role, status
+        FROM users
+        WHERE LOWER(email) = LOWER(?)
+    """, (email.strip(),)).fetchone()
     conn.close()
     return row
+
 
 def get_user_by_username(username):
     conn = get_connection()
-    c = conn.cursor()
-    c.execute(
-        "SELECT id, name, username, email, role, status, first_login, otp_code FROM users WHERE username=?",
-        (username,),
-    )
-    row = c.fetchone()
+    row = conn.execute("""
+        SELECT id, name, username, email, mobile, password, role, status,
+               first_login, otp_code
+        FROM users
+        WHERE LOWER(username) = LOWER(?)
+    """, (username.strip(),)).fetchone()
     conn.close()
     return row
 
-def set_admin_password(user_id, new_password):
+
+def _upgrade_plaintext_password(user_id, password):
     conn = get_connection()
-    c = conn.cursor()
-    c.execute(
-        "UPDATE users SET password=?, first_login=0 WHERE id=?",
-        (new_password, user_id),
+    conn.execute(
+        "UPDATE users SET password=? WHERE id=?",
+        (hash_password(password), user_id),
     )
     conn.commit()
     conn.close()
 
-def set_otp(user_id, otp_code):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET otp_code=? WHERE id=?", (otp_code, user_id))
-    conn.commit()
-    conn.close()
 
-def clear_otp(user_id):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE users SET otp_code=NULL WHERE id=?", (user_id,))
-    conn.commit()
-    conn.close()
-
-# ---------------- USER SIGNUP ----------------
 def signup_form():
-    st.subheader("Sign Up")
+    st.subheader("Create Account")
 
     name = st.text_input("Full Name", key="signup_name")
     username = st.text_input("Username", key="signup_username")
@@ -105,201 +117,259 @@ def signup_form():
     mobile = st.text_input("Mobile Number", key="signup_mobile")
     password = st.text_input("Password", type="password", key="signup_password")
 
-    st.caption("Password must be 8–16 chars, include uppercase, lowercase, digit, special character.")
+    st.caption(
+        "Password: 8–16 characters, with uppercase, lowercase, number and special character."
+    )
+    st.caption("Mobile: numbers only. No fixed length is enforced for international users.")
 
-    if st.button("Create Account", key="signup_btn"):
-        if not name or not username or not email or not mobile or not password:
+    if st.button("Create Account", key="signup_btn", type="primary"):
+        name = name.strip()
+        username = username.strip()
+        email = email.strip().lower()
+        mobile = mobile.strip()
+
+        if not all([name, username, email, mobile, password]):
             st.error("All fields are required.")
             return
 
-        valid_mobile, msg_mobile = validate_mobile(mobile)
+        valid_mobile, mobile_msg = validate_mobile(mobile)
         if not valid_mobile:
-            st.error(msg_mobile)
+            st.error(mobile_msg)
             return
 
-        email_input = email.strip()
-        if not validate_email(email_input):
+        if not validate_email(email):
             st.error("Invalid email address. Please enter a valid email.")
             return
 
-        email_normalized = email_input.lower()
-
-        valid_pass, msg_pass = validate_password(password)
+        valid_pass, pass_msg = validate_password(password)
         if not valid_pass:
-            st.error(msg_pass)
+            st.error(pass_msg)
+            return
+
+        if get_user_by_email(email):
+            st.error("An account with this email already exists. Please log in instead.")
+            return
+
+        if get_user_by_username(username):
+            st.error("That username is already in use. Please choose another username.")
             return
 
         conn = get_connection()
-        c = conn.cursor()
-
-        # Case-insensitive duplicate email check
-        c.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email_normalized,))
-        existing = c.fetchone()
-
-        if existing:
-            st.error("An account with this email already exists. Please log in instead.")
-            conn.close()
-            return
-
         try:
-            c.execute(
-                """
-                INSERT INTO users (name, username, email, mobile, password, role, status, first_login)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (name, username, email_normalized, mobile, password, "user", "active", 0),
-            )
+            conn.execute("""
+                INSERT INTO users
+                (name, username, email, mobile, password, role, status, first_login)
+                VALUES (?, ?, ?, ?, ?, 'user', 'active', 0)
+            """, (
+                name, username, email, mobile, hash_password(password)
+            ))
             conn.commit()
-            st.success("Account created successfully! Please login.")
-            add_log(email_normalized, "signup", "User signed up")
-        except Exception:
-            st.error("An account with this email already exists. Please log in instead.")
+        except Exception as exc:
+            conn.rollback()
+            message = str(exc).lower()
+            if "unique" in message:
+                st.error("Email or username already exists.")
+            else:
+                st.error("Unable to create the account. Please try again.")
+            return
         finally:
             conn.close()
 
-# ---------------- USER LOGIN ----------------
-def login_form():
-    st.subheader("User Login")
+        add_log(email, "SIGNUP", "User created an account.")
+        st.success("Account created successfully. Please log in.")
 
+
+def login_form():
+    st.subheader("Login")
     email = st.text_input("Email", key="user_login_email")
     password = st.text_input("Password", type="password", key="user_login_pass")
 
-    if st.button("Login", key="user_login_btn"):
-        email_input = email.strip().lower()
-        if not validate_email(email_input):
+    if st.button("Login", key="user_login_btn", type="primary"):
+        email = email.strip().lower()
+
+        if not validate_email(email):
             st.error("Invalid email address. Please enter a valid email.")
             return
 
-        user = get_user(email_input, password)
+        user = get_user_by_email(email)
         if not user:
             st.error("Invalid credentials.")
-        else:
-            _id, name, email_db, role, status = user
-
-            if status == "inactive":
-                st.error("Account is deactivated.")
-                return
-
-            st.session_state["user_id"] = _id
-            st.session_state["user_name"] = name
-            st.session_state["user_email"] = email_db
-            st.session_state["role"] = role
-
-            add_log(email_db, "login", "User logged in")
-            st.success("Logged in successfully!")
-            st.rerun()
-
-# ---------------- ADMIN FIRST LOGIN (OTP FLOW) ----------------
-def admin_first_login():
-    st.sidebar.subheader("Admin First Login")
-
-    username = st.sidebar.text_input("Admin Username", key="admin_first_username")
-    email = st.sidebar.text_input("Admin Email", key="admin_first_email")
-
-    if st.sidebar.button("Send Verification Code", key="admin_send_otp"):
-        user = get_user_by_username(username)
-        if not user:
-            st.sidebar.error("Admin user not found.")
             return
 
-        _id, name, u_username, u_email, role, status, first_login, otp_code = user
-
-        if role != "admin":
-            st.sidebar.error("This account is not admin.")
+        if user["status"] != "active":
+            st.error("Account is deactivated.")
             return
 
-        if email.strip().lower() != u_email.strip().lower():
-            st.sidebar.error("Email does not match admin account.")
+        valid, was_plaintext = verify_password(password, user["password"])
+        if not valid:
+            st.error("Invalid credentials.")
             return
 
-        if status == "inactive":
-            st.sidebar.error("Admin account is deactivated.")
-            return
+        if was_plaintext:
+            _upgrade_plaintext_password(user["id"], password)
 
-        if first_login == 0:
-            st.sidebar.info("First login already completed. Use username + password.")
+        st.session_state["user_id"] = user["id"]
+        st.session_state["user_name"] = user["name"]
+        st.session_state["user_email"] = user["email"]
+        st.session_state["role"] = user["role"]
+
+        add_log(user["email"], "LOGIN", "User logged in.")
+        st.success("Logged in successfully!")
+        st.rerun()
+
+
+def set_otp(user_id, otp):
+    conn = get_connection()
+    conn.execute("UPDATE users SET otp_code=? WHERE id=?", (otp, user_id))
+    conn.commit()
+    conn.close()
+
+
+def clear_otp(user_id):
+    conn = get_connection()
+    conn.execute("UPDATE users SET otp_code=NULL WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def set_admin_password(user_id, password):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE users SET password=?, first_login=0 WHERE id=?",
+        (hash_password(password), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def admin_first_login(admin):
+    st.subheader("🔐 Admin First Login")
+    st.info("First login requires verification before setting the admin password.")
+
+    username = st.text_input(
+        "Admin Username",
+        value=admin["username"],
+        key="admin_first_username",
+    )
+    email = st.text_input(
+        "Admin Email",
+        key="admin_first_email",
+    )
+
+    if st.button("Send Verification Code", key="admin_send_otp"):
+        if username.strip().lower() != admin["username"].lower():
+            st.error("Admin username does not match.")
+            return
+        if email.strip().lower() != admin["email"].lower():
+            st.error("Admin email does not match.")
+            return
+        if admin["status"] != "active":
+            st.error("Admin account is deactivated.")
             return
 
         otp = str(random.randint(100000, 999999))
-        set_otp(_id, otp)
+        set_otp(admin["id"], otp)
+        st.session_state["admin_otp_user_id"] = admin["id"]
 
-        st.sidebar.success(f"Verification code sent. (Testing OTP: {otp})")
+        # Demo/cloud-safe behavior: no SMTP dependency.
+        st.success("Verification code generated for this demo.")
+        st.code(otp, language="text")
+        st.caption(
+            "For production email delivery, connect this step to an approved email service."
+        )
 
-        st.session_state["admin_otp_user_id"] = _id
+    if st.session_state.get("admin_otp_user_id") == admin["id"]:
+        otp_input = st.text_input("Enter Verification Code", key="admin_otp_input")
 
-    if "admin_otp_user_id" in st.session_state:
-        otp_input = st.sidebar.text_input("Enter Verification Code", key="admin_otp_input")
-
-        if st.sidebar.button("Verify Code", key="admin_verify_otp"):
-            user_id = st.session_state["admin_otp_user_id"]
-
-            conn = get_connection()
-            c = conn.cursor()
-            c.execute("SELECT otp_code FROM users WHERE id=?", (user_id,))
-            row = c.fetchone()
-            conn.close()
-
-            if not row or not row[0]:
-                st.sidebar.error("No OTP found. Please resend.")
+        if st.button("Verify Code", key="admin_verify_otp"):
+            current = get_user_by_username(admin["username"])
+            if not current or current["otp_code"] != otp_input.strip():
+                st.error("Invalid verification code.")
                 return
 
-            if otp_input != row[0]:
-                st.sidebar.error("Invalid verification code.")
+            clear_otp(admin["id"])
+            st.session_state["admin_verified"] = True
+            st.success("Verification successful. Set your admin password.")
+
+    if st.session_state.get("admin_verified"):
+        new_password = st.text_input(
+            "New Admin Password",
+            type="password",
+            key="admin_new_pass",
+        )
+        confirm_password = st.text_input(
+            "Confirm Admin Password",
+            type="password",
+            key="admin_confirm_pass",
+        )
+
+        if st.button("Set Admin Password", key="admin_set_pass", type="primary"):
+            if new_password != confirm_password:
+                st.error("Passwords do not match.")
                 return
 
-            clear_otp(user_id)
-            st.sidebar.success("Verification successful. Set your admin password below.")
+            valid, msg = validate_password(new_password)
+            if not valid:
+                st.error(msg)
+                return
 
-            new_password = st.sidebar.text_input("New Admin Password", type="password", key="admin_new_pass")
+            set_admin_password(admin["id"], new_password)
+            st.session_state.pop("admin_verified", None)
+            st.session_state.pop("admin_otp_user_id", None)
+            add_log(admin["email"], "ADMIN_SETUP", "Admin password configured.")
+            st.success("Admin password set. You can now log in.")
+            st.rerun()
 
-            if st.sidebar.button("Set Admin Password", key="admin_set_pass"):
-                valid_pass, msg_pass = validate_password(new_password)
-                if not valid_pass:
-                    st.sidebar.error(msg_pass)
-                    return
 
-                set_admin_password(user_id, new_password)
-                st.sidebar.success("Admin password set successfully. Now login with username + password.")
+def admin_normal_login(admin):
+    st.subheader("🔐 Admin Login")
 
-                del st.session_state["admin_otp_user_id"]
+    username = st.text_input(
+        "Admin Username",
+        value=admin["username"],
+        key="admin_normal_username",
+    )
+    password = st.text_input(
+        "Admin Password",
+        type="password",
+        key="admin_normal_pass",
+    )
 
-# ---------------- ADMIN NORMAL LOGIN ----------------
-def admin_normal_login():
-    st.sidebar.subheader("Admin Login")
-
-    username = st.sidebar.text_input("Admin Username", key="admin_normal_username")
-    password = st.sidebar.text_input("Admin Password", type="password", key="admin_normal_pass")
-
-    if st.sidebar.button("Login as Admin", key="admin_normal_login_btn"):
-        user = get_user_by_username(username)
-        if not user:
-            st.sidebar.error("Admin user not found.")
+    if st.button("Login as Admin", key="admin_normal_login_btn", type="primary"):
+        if username.strip().lower() != admin["username"].lower():
+            st.error("Invalid admin credentials.")
+            return
+        if admin["status"] != "active":
+            st.error("Admin account is deactivated.")
             return
 
-        _id, name, u_username, u_email, role, status, first_login, otp_code = user
-
-        if role != "admin":
-            st.sidebar.error("This account is not admin.")
+        valid, was_plaintext = verify_password(password, admin["password"])
+        if not valid:
+            st.error("Invalid admin credentials.")
             return
 
-        if status == "inactive":
-            st.sidebar.error("Admin account is deactivated.")
-            return
+        if was_plaintext:
+            _upgrade_plaintext_password(admin["id"], password)
 
-        conn = get_connection()
-        c = conn.cursor()
-        c.execute("SELECT password FROM users WHERE id=?", (_id,))
-        row = c.fetchone()
-        conn.close()
+        st.session_state["user_id"] = admin["id"]
+        st.session_state["user_name"] = admin["name"]
+        st.session_state["user_email"] = admin["email"]
+        st.session_state["role"] = "admin"
+        st.session_state.pop("show_admin_login", None)
 
-        if not row or row[0] != password:
-            st.sidebar.error("Invalid admin password.")
-            return
-
-        st.session_state["user_id"] = _id
-        st.session_state["user_name"] = name
-        st.session_state["user_email"] = u_email
-        st.session_state["role"] = role
-
+        add_log(admin["email"], "ADMIN_LOGIN", "Admin logged in.")
         st.success("Admin logged in successfully!")
         st.rerun()
+
+
+def logout_user():
+    email = st.session_state.get("user_email")
+    if email:
+        add_log(email, "LOGOUT", "User logged out.")
+
+    for key in [
+        "user_id", "user_name", "user_email", "role",
+        "show_admin_login", "admin_otp_user_id", "admin_verified",
+        "confirm_delete_id",
+    ]:
+        st.session_state.pop(key, None)
