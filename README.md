@@ -20,41 +20,32 @@ A Python-based job application tracking and analytics dashboard.
 
 ## Admin Access
 
-The application uses one predefined administrator account.
+The application uses a predefined Admin account.
 
-### Admin Login
+### Admin Credentials
 
 Username:
-
 `Kat`
 
 Password:
-
 `Kat@2026`
 
-The Admin account is automatically created when the application initializes the database.
+The Admin account is automatically created in the database when the application starts.
 
-There is:
+Admin Signup and Admin First-Time Login are not available.
 
-- No Admin Signup
-- No Admin First-Time Login
-- No Admin OTP setup
-- No Admin password creation page
+The Home page contains the Admin button. Clicking it opens the Admin Login directly.
 
-The Home page contains the small **Admin** button. Clicking it opens the **Admin Login** screen directly.
+After successful Admin authentication, the Admin Dashboard provides:
 
-After successful authentication, the Admin Dashboard provides:
-
-- User management
-- User status updates
+- User Management
+- User Status Management
 - Activity Logs
 
 ## Security
 
-The Admin password is converted to a PBKDF2-SHA256 password hash before being stored in the SQLite database.
+The Admin password is stored in the SQLite database as a PBKDF2-SHA256 hash.
 
-The normal User Signup form always creates accounts with the `user` role.
+The normal Create Account form creates only regular user accounts.
 
-Admin accounts cannot be created through the normal User Signup page.
-
-**Important:** Keep this repository private because the predefined Admin credentials are configured in `database.py`.
+Keep the GitHub repository private because the predefined Admin credentials are configured in `database.py`.
