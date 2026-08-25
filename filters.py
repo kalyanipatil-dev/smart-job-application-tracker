@@ -1,32 +1,34 @@
 import pandas as pd
 
-# ---------------- SEARCH FILTER ----------------
+
 def apply_search(df, query):
-    if not query:
-        return df
+    if df.empty or not query or not query.strip():
+        return df.copy()
 
-    query = query.lower()
+    query = query.strip().lower()
 
-    return df[
-        df["Company"].str.lower().str.contains(query, na=False)
-        | df["Job Title"].str.lower().str.contains(query, na=False)
-        | df["Country"].str.lower().str.contains(query, na=False)
-    ]
+    company = df["Company"].fillna("").astype(str).str.lower()
+    title = df["Job Title"].fillna("").astype(str).str.lower()
+    country = df["Country"].fillna("").astype(str).str.lower()
 
-# ---------------- ADVANCED FILTERS ----------------
-def apply_filters(df, country, status, visa, currency):
+    mask = (
+        company.str.contains(query, regex=False)
+        | title.str.contains(query, regex=False)
+        | country.str.contains(query, regex=False)
+    )
+    return df.loc[mask].copy()
+
+
+def apply_filters(df, country="All", status="All", visa="All", currency="All"):
     filtered = df.copy()
 
     if country != "All":
         filtered = filtered[filtered["Country"] == country]
-
     if status != "All":
         filtered = filtered[filtered["Status"] == status]
-
     if visa != "All":
         filtered = filtered[filtered["Visa"] == visa]
-
     if currency != "All":
         filtered = filtered[filtered["Currency"] == currency]
 
-    return filtered
+    return filtered.copy()
