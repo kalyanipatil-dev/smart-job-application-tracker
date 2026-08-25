@@ -740,16 +740,16 @@ def main():
 
         return
 
-    if st.session_state.get("role") == "admin":
-    admin_dashboard()
+if st.session_state.get("role") == "admin":
+   admin_dashboard()
 
-    if st.button(
-        "← Back to Home",
-        key="admin_dashboard_back_home"
-    ):
-        back_to_home()
+   if st.button(
+      "← Back to Home",
+      key="admin_dashboard_back_home"
+   ):
+      back_to_home()
 
-    return
+   return
 
     render_user_dashboard()
 
