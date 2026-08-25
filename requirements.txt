@@ -1,6 +1,7 @@
 streamlit
 pandas
-python-docx
 openpyxl
-xlsxwriter
-plotly
+python-docx
+reportlab
+bcrypt
+matplotlib
