@@ -78,10 +78,15 @@ def clear_navigation_flags():
 def back_to_home():
     clear_navigation_flags()
 
+    # Admin session मधून बाहेर येऊन Home page वर जा
+    st.session_state.pop("user_id", None)
+    st.session_state.pop("user_name", None)
+    st.session_state.pop("user_email", None)
+    st.session_state.pop("role", None)
+
     st.session_state["page"] = "home"
 
     st.rerun()
-
 
 def render_header():
     left, spacer, logout_col, admin_col = st.columns(
@@ -735,11 +740,16 @@ def main():
 
         return
 
-    if st.session_state.get(
-        "role"
-    ) == "admin":
-        admin_dashboard()
-        return
+    if st.session_state.get("role") == "admin":
+    admin_dashboard()
+
+    if st.button(
+        "← Back to Home",
+        key="admin_dashboard_back_home"
+    ):
+        back_to_home()
+
+    return
 
     render_user_dashboard()
 
